@@ -1,22 +1,26 @@
-use colored::Colorize;
 use std::cell::RefCell;
-use std::cmp;
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
+use std::fmt;
+use std::fmt::Write;
 use std::fs::read_to_string;
+use std::process::ExitCode;
 use std::rc::Rc;
 use termsize;
 
 static ROOT: &str = "/";
 
-fn main() {
+fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
-    assert! {
-        args.len() >= 2,
-        "ERR-001: 'todotree' needs one file and optionally a list of todo"
+    if args.len() < 2 {
+        eprintln!("ERR-001: 'todotree' needs one file and optionally a list of todo");
+        return ExitCode::FAILURE;
     }
-    Todo::main(args[1].as_str(), &args[2..]);
+    let tree = Todo::main(args[1].as_str(), &args[2..], 0);
+    print!("{}", tree);
+    ExitCode::SUCCESS
 }
 
 struct Todo {
@@ -27,33 +31,36 @@ struct Todo {
     wait: bool,
     dependencies: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
+    maxlens: [usize; 3],
+}
+
+impl fmt::Display for Todo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_header(f)?;
+        let mut connectors: Vec<bool> = Vec::new();
+        self.fmt_tree(f, &mut connectors, &self.maxlens)?;
+        Ok(())
+    }
 }
 
 impl Todo {
-    fn main(mdfile: &str, targets: &[String]) {
+    fn main(mdfile: &str, targets: &[String], default_screen_width: usize) -> String {
         let map = Todo::readmd(mdfile, targets);
         let mut root = map.get(ROOT).unwrap().borrow_mut();
 
         let mut path: HashSet<String> = HashSet::new();
         let mut visited: HashSet<String> = HashSet::new();
-        let screen_width: usize = match termsize::get() {
-            None => 80,
-            Some(x) => x.cols.into(),
+        let screen_width: usize = match default_screen_width {
+            0 => match termsize::get() {
+                None => 80,
+                Some(x) => x.cols.into(),
+            },
+            _ => default_screen_width,
         };
-        let mut column_width: [usize; 3] = [0; 3];
-        root.build_tree(&map, &mut path, &mut visited, &mut column_width, 0);
-
-        assert!(
-            screen_width > column_width[0] + column_width[1] + 8,
-            "ERR-002: Screen is too narrow for this todotree markdown file"
-        );
-        column_width[2] = cmp::min(
-            column_width[2],
-            screen_width - column_width[0] - column_width[1] - 8,
-        );
-        Todo::print_header(&column_width);
-        let mut connectors: Vec<bool> = Vec::new();
-        root.print_tree(&mut connectors, &column_width);
+        root.build_tree(&map, &mut path, &mut visited, 0, screen_width);
+        let mut tree = String::new();
+        assert!(write!(tree, "{}", root).is_ok(), "ERR-010: write error");
+        tree
     }
 
     fn readmd(mdfile: &str, params: &[String]) -> HashMap<String, Rc<RefCell<Todo>>> {
@@ -62,15 +69,12 @@ impl Todo {
         let mut owner = String::new();
         let mut comment = String::new();
         let mut dependencies: Vec<String> = Vec::new();
-		let mut targets = params.to_vec();
-/*
-        match read_to_string(mdfile) {
-			None => panic!("ERR-888: no such a todotree markdown file '{}'", mdfile),
-			Some(md) => {
-			}
-		}
-*/
-        for ln in read_to_string(mdfile).unwrap().lines() {
+        let mut targets = params.to_vec();
+        let buffer = match read_to_string(mdfile) {
+            Ok(md) => md,
+            Err(e) => panic!("ERR-009: no such a todotree markdown file '{}'", e),
+        };
+        for ln in buffer.lines() {
             if ln.starts_with("# ") {
                 Todo::create(&mut name, &owner, &comment, &dependencies, &mut map);
                 name = ln.get(2..).unwrap().trim().to_string();
@@ -114,12 +118,13 @@ impl Todo {
             ROOT.to_owned(),
             Rc::new(RefCell::new(Todo {
                 name: ROOT.to_owned(),
-                owner: "OWNER".to_owned(),
-                comment: "COMMENT".to_owned(),
+                owner: "".to_owned(),
+                comment: "".to_owned(),
                 done: false,
                 wait: false,
                 dependencies: targets.to_vec(),
                 children: Vec::new(),
+                maxlens: [0; 3],
             })),
         );
         map
@@ -151,6 +156,7 @@ impl Todo {
             wait: false,
             dependencies: dependencies.clone(),
             children: Vec::new(),
+            maxlens: [0; 3],
         };
         map.insert(name.clone(), Rc::new(RefCell::new(todo)));
     }
@@ -160,9 +166,9 @@ impl Todo {
         map: &HashMap<String, Rc<RefCell<Todo>>>,
         path: &mut HashSet<String>,
         visited: &mut HashSet<String>,
-        column_width: &mut [usize; 3],
         depth: usize,
-    ) {
+        screen_width: usize,
+    ) -> [usize; 3] {
         self.wait = false;
         for dep in &self.dependencies {
             assert!(
@@ -175,67 +181,124 @@ impl Todo {
                 Some(child) => {
                     if visited.insert(dep.clone()) {
                         self.children.push(Rc::clone(child));
-                        child
-                            .borrow_mut()
-                            .build_tree(map, path, visited, column_width, depth + 1);
+                        let lens = child.borrow_mut().build_tree(
+                            map,
+                            path,
+                            visited,
+                            depth + 1,
+                            screen_width,
+                        );
+                        for i in 0..3 {
+                            self.maxlens[i] = max(self.maxlens[i], lens[i]);
+                        }
                     }
                     self.wait = self.wait || !child.borrow().done;
                 }
             };
             path.remove(dep);
         }
-        column_width[0] = cmp::max(column_width[0], depth * 4 + self.name.len());
-        column_width[1] = cmp::max(column_width[1], self.owner.len());
-        column_width[2] = cmp::max(column_width[2], self.comment.len());
+        if self.name == ROOT {
+            if self.maxlens[1] > 0 {
+                self.owner = "OWNER".to_owned();
+            }
+            if self.maxlens[2] > 0 {
+                self.comment = "COMMENT".to_owned();
+            }
+            assert!(
+                screen_width > self.maxlens[0] + self.maxlens[1] + 8,
+                "ERR-002: Screen is too narrow for this todotree markdown file"
+            );
+            self.maxlens[2] = min(
+                self.maxlens[2],
+                screen_width - self.maxlens[0] - self.maxlens[1] - 8,
+            );
+        }
+        self.maxlens[0] = max(self.maxlens[0], depth * 4 + self.name.len());
+        self.maxlens[1] = max(self.maxlens[1], self.owner.len());
+        self.maxlens[2] = max(self.maxlens[2], self.comment.len());
+        self.maxlens
     }
 
-    fn print_tree(&self, connectors: &mut Vec<bool>, column_width: &[usize; 3]) {
+    fn fmt_tree(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        connectors: &mut Vec<bool>,
+        maxlens: &[usize; 3],
+    ) -> fmt::Result {
         for (pos, cn) in connectors.iter().enumerate() {
             if *cn {
                 if pos + 1 < connectors.len() {
-                    print!("    ");
+                    write!(f, "    ")?;
                 } else {
-                    print!("└── ");
+                    write!(f, "└── ")?;
                 }
             } else if pos + 1 < connectors.len() {
-                print!("│   ");
+                write!(f, "│   ")?;
             } else {
-                print!("├── ");
+                write!(f, "├── ")?;
             }
         }
         if self.done {
-            print!("{}", self.name.strikethrough());
+            // strikethrough
+            write!(f, "\x1b\x5b\x39\x6d{}\x1b\x28\x42\x1b\x5b\x6d", self.name)?;
         } else if self.wait {
-            print!("{}", self.name);
+            write!(f, "{}", self.name)?;
         } else {
-            print!("{}", self.name.red());
+            // red
+            write!(
+                f,
+                "\x1b\x5b\x33\x31\x6d{}\x1b\x28\x42\x1b\x5b\x6d",
+                self.name
+            )?;
         }
-        print!(
+        write!(
+            f,
             "{}",
-            " ".repeat(column_width[0] - connectors.len() * 4 - self.name.len())
-        );
-        print!(" │ ");
-        print!("{}", self.owner);
-        print!("{}", " ".repeat(column_width[1] - self.owner.len()));
-        print!(" │ ");
-        self.print_comment(connectors, column_width, &mut 0);
+            " ".repeat(maxlens[0] - connectors.len() * 4 - self.name.len())
+        )?;
+        match maxlens[1] + maxlens[2] {
+            0 => writeln!(f)?,
+            _ => {
+                write!(f, " │ ")?;
+                write!(f, "{}", self.owner)?;
+                write!(f, "{}", " ".repeat(maxlens[1] - self.owner.len()))?;
+                if maxlens[1] > 0 && maxlens[2] > 0 {
+                    write!(f, " │ ")?;
+                }
+                self.fmt_comment(f, connectors, maxlens, &mut 0)?;
+            }
+        }
         for (pos, child) in self.children.iter().enumerate() {
             connectors.push(pos + 1 == self.children.len());
-            child.borrow().print_tree(connectors, column_width);
+            child.borrow().fmt_tree(f, connectors, maxlens)?;
             connectors.pop();
         }
+        Ok(())
     }
 
-    fn print_header(column_width: &[usize; 3]) {
-        print!("{}", " ".repeat(column_width[0]));
-        print!(" ┌─");
-        print!("{}", "─".repeat(column_width[1]));
-        print!("─┬─");
-        print!("{}", "─".repeat(column_width[2]));
-        println!("─┐");
+    fn fmt_header(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.maxlens[1] + self.maxlens[2] > 0 {
+            write!(f, "{}", " ".repeat(self.maxlens[0]))?;
+            write!(f, " ┌─")?;
+            write!(f, "{}", "─".repeat(self.maxlens[1]))?;
+            if self.maxlens[1] > 0 && self.maxlens[2] > 0 {
+                write!(f, "─┬─")?;
+            }
+            write!(f, "{}", "─".repeat(self.maxlens[2]))?;
+            writeln!(f, "─┐")?;
+        } else {
+            write!(f, "")?;
+        }
+        Ok(())
     }
 
-    fn print_comment(&self, connectors: &Vec<bool>, column_width: &[usize; 3], start: &mut usize) {
+    fn fmt_comment(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        connectors: &Vec<bool>,
+        maxlens: &[usize; 3],
+        start: &mut usize,
+    ) -> fmt::Result {
         let mut last = self.children.len() == 0;
         if last {
             for b in connectors {
@@ -246,67 +309,83 @@ impl Todo {
             }
         }
         loop {
-            let slen = cmp::min(self.comment.len() - *start, column_width[2]);
-            print!("{}", &self.comment[*start..*start + slen]);
-            print!("{}", " ".repeat(column_width[2] - slen));
-            println!(" │");
+            let slen = min(self.comment.len() - *start, maxlens[2]);
+            write!(f, "{}", &self.comment[*start..*start + slen])?;
+            write!(f, "{}", " ".repeat(maxlens[2] - slen))?;
+            writeln!(f, " │")?;
             *start = *start + slen;
             for b in connectors {
                 match *b {
-                    true => print!(" "),
-                    false => print!("│"),
-                }
-                print!("   ");
+                    true => write!(f, " ")?,
+                    false => write!(f, "│")?,
+                };
+                write!(f, "   ")?;
             }
             match self.children.len() {
-                0 => print!("    "),
-                _ => print!("│   "),
-            };
-            print!("{}", " ".repeat(column_width[0] - 4 - connectors.len() * 4));
+                0 => write!(f, "    "),
+                _ => write!(f, "│   "),
+            }?;
+            write!(f, "{}", " ".repeat(maxlens[0] - 4 - connectors.len() * 4))?;
             if *start < self.comment.len() {
-                print!(" │ ");
-                print!("{}", " ".repeat(column_width[1]));
-                print!(" │ ");
+                write!(f, " │ ")?;
+                write!(f, "{}", " ".repeat(maxlens[1]))?;
+                if maxlens[1] > 0 && maxlens[2] > 0 {
+                    write!(f, " │ ")?;
+                }
             } else {
                 match last {
-                    false => print!(" ├─"),
-                    true => print!(" └─"),
-                };
-                print!("{}", "─".repeat(column_width[1]));
+                    false => write!(f, " ├─"),
+                    true => write!(f, " └─"),
+                }?;
+                write!(f, "{}", "─".repeat(maxlens[1]))?;
+                if maxlens[1] > 0 && maxlens[2] > 0 {
+                    match last {
+                        false => write!(f, "─┼─"),
+                        true => write!(f, "─┴─"),
+                    }?;
+                }
+                write!(f, "{}", "─".repeat(maxlens[2]))?;
                 match last {
-                    false => print!("─┼─"),
-                    true => print!("─┴─"),
-                };
-                print!("{}", "─".repeat(column_width[2]));
-                match last {
-                    false => print!("─┤"),
-                    true => print!("─┘"),
-                };
+                    false => writeln!(f, "─┤"),
+                    true => writeln!(f, "─┘"),
+                }?;
                 break;
             }
         }
-        println!();
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_main() {
-        Todo::main("todo.md", &mut Vec::<String>::new());
+        for path in fs::read_dir("examples").unwrap() {
+            let md = path.unwrap().path().display().to_string();
+            if !md.ends_with(".md") {
+                continue;
+            }
+            let output = Todo::main(&md, &mut Vec::<String>::new(), 80);
+            let txt = md.replace(".md", ".txt");
+            let standard = match read_to_string(txt) {
+                Ok(s) => s,
+                Err(e) => panic!("ERR-009: no such a todotree markdown file '{}'", e),
+            };
+            assert_eq!(standard, output, "");
+        }
     }
-
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "ERR-007: Todo '1' has a dependency loop")]
     fn test_loop1() {
-        Todo::main("src/tests/loop1.md", &mut Vec::<String>::new());
+        Todo::main("src/tests/loop1.md", &mut Vec::<String>::new(), 0);
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "ERR-007: Todo '3' has a dependency loop")]
     fn test_loop2() {
-        Todo::main("src/tests/loop2.md", &mut Vec::<String>::new());
+        Todo::main("src/tests/loop2.md", &mut Vec::<String>::new(), 0);
     }
 }
