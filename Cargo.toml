@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-colored = "3.0.0"
+getopts = "0.2.21"
+regex = "1.11.1"
 termsize = "0.1.9"

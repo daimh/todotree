@@ -1,0 +1,38 @@
+{
+  "name": "/",
+  "status": null,
+  "dependencies": [
+    {
+      "name": "movie",
+      "status": null,
+      "dependencies": [
+        {
+          "name": "dinner",
+          "status": "red",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "garden",
+          "status": "strikethrough",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "lawn",
+          "status": "red",
+          "dependencies": [
+            {
+              "name": "mower",
+              "status": "strikethrough",
+              "dependencies": [
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

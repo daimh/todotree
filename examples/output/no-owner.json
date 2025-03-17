@@ -1,0 +1,44 @@
+{
+  "name": "/",
+  "status": null,
+  "comment": "COMMENT",
+  "dependencies": [
+    {
+      "name": "movie",
+      "status": null,
+      "comment": "at 7pm, arrive at the movie theater",
+      "dependencies": [
+        {
+          "name": "dinner",
+          "status": "red",
+          "comment": "at 6pm, we will eat",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "garden",
+          "status": "strikethrough",
+          "comment": "before 6pm, fertilize the tomato bed, then plant it",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "lawn",
+          "status": "red",
+          "comment": "at noon, mow the lawn",
+          "dependencies": [
+            {
+              "name": "mower",
+              "status": "strikethrough",
+              "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
+              "dependencies": [
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

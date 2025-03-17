@@ -1,0 +1,44 @@
+{
+  "name": "/",
+  "status": null,
+  "owner": "OWNER",
+  "dependencies": [
+    {
+      "name": "movie",
+      "status": null,
+      "owner": "family",
+      "dependencies": [
+        {
+          "name": "dinner",
+          "status": "red",
+          "owner": "Mom",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "garden",
+          "status": "strikethrough",
+          "owner": "Dad",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "lawn",
+          "status": "red",
+          "owner": "Avery",
+          "dependencies": [
+            {
+              "name": "mower",
+              "status": "strikethrough",
+              "owner": "Brody",
+              "dependencies": [
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
