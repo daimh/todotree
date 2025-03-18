@@ -5,5 +5,4 @@ edition = "2024"
 
 [dependencies]
 getopts = "0.2.21"
-regex = "1.11.1"
 termsize = "0.1.9"

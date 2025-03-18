@@ -1,7 +1,6 @@
 use crate::todotree::HTMLP;
 use crate::todotree::ROOT;
 use crate::todotree::tree::Format;
-use regex::RegexSet;
 use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::collections::HashMap;
@@ -20,18 +19,29 @@ pub struct Todo {
 }
 
 impl Todo {
-    pub fn new(name: String, owner: String, comment: String, dependencies: Vec<String>) -> Self {
-        let re = RegexSet::new(&[r"^(~{2})(\w)+(~{2})$", r"^(\w)+$"]).unwrap();
-        assert!(
-            name == "/" || re.is_match(name.as_str()),
-            "ERR-003: todo name '{}' contains some character that is not alphabet, digit or underline",
-            name
-        );
-        let done = name.starts_with("~~");
+    pub fn new(
+        name: String,
+        owner: String,
+        comment: String,
+        dependencies: Vec<String>,
+    ) -> Self {
+        let done = name.starts_with("~~") && name.ends_with("~~");
         let realname = match done {
-            true => name.replace("~~", ""),
-            false => name,
+            true => name[2..name.len() - 2].to_string(),
+            false => name.clone(),
         };
+        for c in realname.chars() {
+            assert!(
+                c == '-'
+                    || c == '/'
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9'),
+                "ERR-003: todo name '{}' contains some character '{}', which is not alphabet, digit, '-' or '/'",
+                name,
+                c
+            );
+        }
         Todo {
             name: realname,
             owner: owner,
@@ -51,6 +61,7 @@ impl Todo {
         visited: &mut HashSet<String>,
         depth: usize,
         screen_width: usize,
+        nodone: bool,
     ) {
         self.wait = false;
         for dep in &self.dependencies {
@@ -62,7 +73,9 @@ impl Todo {
             match map.get(dep) {
                 None => panic!("ERR-003: No such a Todo '{}'", dep),
                 Some(child) => {
-                    if visited.insert(dep.to_string()) {
+                    if visited.insert(dep.to_string())
+                        && (!child.borrow().done || !nodone)
+                    {
                         self.children.push(Rc::clone(child));
                         child.borrow_mut().build_tree(
                             map,
@@ -71,6 +84,7 @@ impl Todo {
                             visited,
                             depth + 1,
                             screen_width,
+                            nodone,
                         );
                     }
                     self.wait = self.wait || !child.borrow().done;
@@ -89,7 +103,8 @@ impl Todo {
                 screen_width > maxlens[0] + maxlens[1] + 8,
                 "ERR-002: Screen is too narrow for this todotree markdown file"
             );
-            maxlens[2] = min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);
+            maxlens[2] =
+                min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);
         }
         maxlens[0] = max(maxlens[0], depth * 4 + self.name.len());
         maxlens[1] = max(maxlens[1], self.owner.len());
@@ -124,7 +139,11 @@ impl Todo {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
                 }
                 if maxlens[2] > 0 {
-                    writeln!(fo, "{}  \"comment\": \"{}\",", space, self.comment)?;
+                    writeln!(
+                        fo,
+                        "{}  \"comment\": \"{}\",",
+                        space, self.comment
+                    )?;
                 }
                 writeln!(fo, "{}  \"dependencies\": [", space)?;
             }
@@ -152,7 +171,8 @@ impl Todo {
                         "{}",
                         match format {
                             Format::Term => "\x1b\x5b\x39\x6d",
-                            Format::Html => "<span style='text-decoration:line-through'>",
+                            Format::Html =>
+                                "<span style='text-decoration:line-through'>",
                             Format::Json => panic!("ERR-010"),
                         }
                     )?;
@@ -183,18 +203,26 @@ impl Todo {
                 write!(
                     fo,
                     "{}",
-                    space.repeat(maxlens[0] - connectors.len() * 4 - self.name.len())
+                    space.repeat(
+                        maxlens[0] - connectors.len() * 4 - self.name.len()
+                    )
                 )?;
                 match maxlens[1] + maxlens[2] {
                     0 => writeln!(fo)?,
                     _ => {
                         write!(fo, "{}│{}", space, space)?;
                         write!(fo, "{}", self.owner)?;
-                        write!(fo, "{}", space.repeat(maxlens[1] - self.owner.len()))?;
+                        write!(
+                            fo,
+                            "{}",
+                            space.repeat(maxlens[1] - self.owner.len())
+                        )?;
                         if maxlens[1] > 0 && maxlens[2] > 0 {
                             write!(fo, "{}│{}", space, space)?;
                         }
-                        self.fmt_comment(fo, connectors, &mut 0, maxlens, format)?;
+                        self.fmt_comment(
+                            fo, connectors, &mut 0, maxlens, format,
+                        )?;
                     }
                 }
             }

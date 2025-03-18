@@ -20,29 +20,39 @@ pub struct Tree {
     format: Format,
     maxlens: [usize; 3],
     map: HashMap<String, Rc<RefCell<Todo>>>,
+    list: Vec<String>,
 }
 
 impl fmt::Display for Tree {
     fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_header(fo)?;
         let mut connectors: Vec<bool> = Vec::new();
-        self.root
-            .borrow()
-            .fmt_tree(fo, &mut connectors, &self.maxlens, &self.format)?;
+        self.root.borrow().fmt_tree(
+            fo,
+            &mut connectors,
+            &self.maxlens,
+            &self.format,
+        )?;
         Ok(())
     }
 }
 
 impl Tree {
-    pub fn new(mdfile: &str, targets: &[String], default_screen_width: usize, fmt_s: &str) -> Self {
-        let format = match fmt_s {
+    pub fn new(
+        mdfile: &str,
+        targets: &[String],
+        nodone: bool,
+        default_screen_width: usize,
+        format: &str,
+    ) -> Self {
+        let format_enum = match format {
             "html" => Format::Html,
             "json" => Format::Json,
             "term" => Format::Term,
             "" => Format::Term,
             _ => panic!("ERR-013: wrong format string"),
         };
-        let screen_width: usize = match format {
+        let screen_width: usize = match format_enum {
             Format::Term => match default_screen_width {
                 0 => match termsize::get() {
                     None => 80,
@@ -59,21 +69,45 @@ impl Tree {
                 String::new(),
                 targets.to_vec(),
             ))),
-            format: format,
+            format: format_enum,
             maxlens: [0; 3],
             map: HashMap::new(),
+            list: Vec::new(),
         };
         tree.readmd(mdfile);
-        let mut path: HashSet<String> = HashSet::new();
-        let mut visited: HashSet<String> = HashSet::new();
-        tree.root.borrow_mut().build_tree(
-            &tree.map,
-            &mut tree.maxlens,
-            &mut path,
-            &mut visited,
-            0,
-            screen_width,
-        );
+        assert!(tree.list.len() > 0, "ERR-014: ");
+        {
+            let mut root = tree.root.borrow_mut();
+            if root.dependencies.len() == 0 {
+                let mut noparent: HashSet<&String> =
+                    HashSet::from_iter(&tree.list);
+                for todo in tree.map.values() {
+                    for dep in &todo.borrow().dependencies {
+                        noparent.remove(dep);
+                    }
+                }
+                assert!(
+                    noparent.len() > 0,
+                    "ERR-013: all todos are in a dependency loop"
+                );
+                for nm in &tree.list {
+                    if noparent.contains(nm) {
+                        root.dependencies.push(nm.clone());
+                    }
+                }
+            }
+            let mut path: HashSet<String> = HashSet::new();
+            let mut visited: HashSet<String> = HashSet::new();
+            root.build_tree(
+                &tree.map,
+                &mut tree.maxlens,
+                &mut path,
+                &mut visited,
+                0,
+                screen_width,
+                nodone,
+            );
+        }
         tree
     }
 
@@ -84,9 +118,7 @@ impl Tree {
         let mut dependencies: Vec<String> = Vec::new();
         let buffer = match read_to_string(mdfile) {
             Ok(md) => md,
-            Err(e) => {
-                panic!("ERR-008: no such a todotree markdown file '{}'", e)
-            }
+            Err(e) => panic!("ERR-008: '{}', {}", mdfile, e),
         };
         for ln in buffer.lines() {
             if ln.starts_with("# ") {
@@ -97,10 +129,6 @@ impl Tree {
                     "ERR-009: '{}' is a reserved Todo name keyword",
                     ROOT
                 );
-                let mut root_mut = self.root.borrow_mut();
-                if root_mut.dependencies.len() == 0 {
-                    root_mut.dependencies.push(name.clone());
-                }
                 owner = String::new();
                 comment = String::new();
                 dependencies = Vec::new();
@@ -146,8 +174,9 @@ impl Tree {
             return;
         }
         let todo = Todo::new(name, owner, comment, dependencies);
-        self.map
-            .insert(todo.name.clone(), Rc::new(RefCell::new(todo)));
+        let nm = todo.name.clone();
+        self.map.insert(nm.clone(), Rc::new(RefCell::new(todo)));
+        self.list.push(nm);
     }
 
     fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
