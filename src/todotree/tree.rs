@@ -137,12 +137,14 @@ impl Tree {
             } else if ln.starts_with("- % ") {
                 comment = ln.get(4..).unwrap().trim().to_string();
             } else if ln.starts_with("- : ") {
-                dependencies = ln
-                    .get(4..)
-                    .unwrap()
-                    .split_whitespace()
-                    .map(str::to_string)
-                    .collect();
+                dependencies.append(
+                    &mut ln
+                        .get(4..)
+                        .unwrap()
+                        .split_whitespace()
+                        .map(str::to_string)
+                        .collect::<Vec<String>>(),
+                );
             }
         }
         self.new_todo_if_any(name, owner, comment, dependencies);
@@ -175,8 +177,12 @@ impl Tree {
         }
         let todo = Todo::new(name, owner, comment, dependencies);
         let nm = todo.name.clone();
-        self.map.insert(nm.clone(), Rc::new(RefCell::new(todo)));
-        self.list.push(nm);
+        match self.map.insert(nm.clone(), Rc::new(RefCell::new(todo))) {
+            Some(_) => {
+                panic!("ERR-016: duplicated todo name '{}'", nm)
+            }
+            None => self.list.push(nm),
+        }
     }
 
     fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {

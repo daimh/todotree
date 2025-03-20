@@ -45,15 +45,15 @@ todotree -o json -i no-owner.md > no-owner.json
 todotree -h
 ```
 
-- compile static linked exectuble
+- compile statically linked exectuable
 ```
 RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 ```
 
-The input markdown file requires four special tags
-1. "# " followed by the todo's name. Mandatory. The character is alphabet, digit, '-' or '/' only. To mark the job as done, surround the name by '\~\~'. which has a strikethrough style in the input makrdown file, the output html and json files, and the terminal output
+Each todo in the input markdown file is defined by four special lines
+1. "# " followed by the todo's name. Mandatory. The characters allowed are alphabets, digits, and some special charaters. To mark the job as done, enclose the name with '\~\~'. which applies a strikethrough style style to the input markdown file, the output html file and the terminal output.
 1. "- @ ", followed by the todo's owner, optional
-1. "- : ", followed by the todo's dependency list, optional
+1. "- : ", followed by the todo's dependency list, which can be split to multiple lines for easier editing, optional
 1. "- % ", followed by the todo's comment, optional
 
 ## My 2 Cents

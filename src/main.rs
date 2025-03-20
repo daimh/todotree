@@ -62,7 +62,7 @@ fn main() -> ExitCode {
 }
 
 fn print_version() {
-    println!("20250317");
+    println!("20250319");
 }
 
 fn print_usage(opts: &Options) {
@@ -123,10 +123,34 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR-007: Todo '1' has a dependency loop")]
-    fn test_loop1() {
+    #[should_panic(expected = "ERR-016: duplicated todo name 'duplicated'")]
+    fn test_016() {
         Tree::new(
-            "src/tests/loop1.md",
+            "src/tests/ERR-016.md",
+            &Vec::<String>::new(),
+            false,
+            0,
+            "term",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR-013: all todos are in a dependency loop")]
+    fn test_007() {
+        Tree::new(
+            "src/tests/ERR-007-1.md",
+            &Vec::<String>::new(),
+            false,
+            0,
+            "term",
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR-007: Todo '1' has a dependency loop")]
+    fn test_007_1() {
+        Tree::new(
+            "src/tests/ERR-007-1.md",
             &vec![String::from("1")],
             false,
             0,
@@ -136,9 +160,9 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "ERR-007: Todo '3' has a dependency loop")]
-    fn test_loop2() {
+    fn test_007_2() {
         Tree::new(
-            "src/tests/loop2.md",
+            "src/tests/ERR-007-2.md",
             &vec![String::from("1")],
             false,
             0,

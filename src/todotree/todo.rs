@@ -30,16 +30,20 @@ impl Todo {
             true => name[2..name.len() - 2].to_string(),
             false => name.clone(),
         };
+        static SPECIALS: [char; 18] = [
+            '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
+            '\'', '"', '.', '/', '?',
+        ];
         for c in realname.chars() {
             assert!(
-                c == '-'
-                    || c == '/'
+                SPECIALS.contains(&c)
                     || (c >= 'a' && c <= 'z')
                     || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9'),
-                "ERR-003: todo name '{}' contains some character '{}', which is not alphabet, digit, '-' or '/'",
+                "ERR-003: todo name '{}' contains some character '{}', which is not alphabet, digit, or {:?}",
                 name,
-                c
+                c,
+                SPECIALS
             );
         }
         Todo {

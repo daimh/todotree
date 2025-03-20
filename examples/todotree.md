@@ -1,6 +1,7 @@
 # movie
 - @ family
-- : dinner garden lawn
+- : dinner garden 
+- : lawn
 - % at 7pm, arrive at the movie theater
 
 # dinner
