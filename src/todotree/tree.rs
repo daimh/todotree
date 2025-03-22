@@ -41,9 +41,9 @@ impl Tree {
     pub fn new(
         mdfile: &str,
         targets: &[String],
-        nodone: bool,
         default_screen_width: usize,
         format: &str,
+        hide: bool,
     ) -> Self {
         let format_enum = match format {
             "html" => Format::Html,
@@ -105,7 +105,7 @@ impl Tree {
                 &mut visited,
                 0,
                 screen_width,
-                nodone,
+                hide,
             );
         }
         tree
@@ -152,13 +152,15 @@ impl Tree {
             self.map.len() > 0,
             "ERR-004: The markdown file doesn't have any Todo"
         );
-        for todo in &self.root.borrow_mut().dependencies {
-            assert!(
-                self.map.contains_key(todo),
-                "ERR-005: Todo '{}' is missing in the markdown file",
-                todo
-            );
-        }
+        /*
+                for todo in &self.root.borrow_mut().dependencies {
+                    assert!(
+                        self.map.contains_key(todo),
+                        "ERR-005: Todo '{}' is missing in the markdown file",
+                        todo
+                    );
+                }
+        */
     }
 
     fn new_todo_if_any(
@@ -171,7 +173,8 @@ impl Tree {
         if name == "" {
             assert!(
                 owner == "" && comment == "" && dependencies.len() == 0,
-                "ERR-006: Missing '# [TODO]' before '- @', '- :', or '-  %' in the todotree markdown file"
+                "ERR-006: Missing '# [TODO]' before '- @', '- :', or '-  %' \
+				in the todotree markdown file"
             );
             return;
         }

@@ -27,4 +27,4 @@ We cannot do it too early because the grass is too wet in morning
 - @ Brody
 - % before noon, test the mower. Don't do it too early, as it might wake up neighbors
 
-Likely, the mower is running out of gas.
+'~[TODO]' works the same as '\~\~[TODO]\~\~'. It saves typing, but won't have the strikethrough in markdown file
