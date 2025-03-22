@@ -59,7 +59,7 @@ RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 ```
 
 Each todo in the input markdown file is defined by four special lines
-1. "# " followed by the todo's name. Mandatory. The characters allowed are alphabets, digits, and some special charaters. To mark the job as done, enclose the name with '\~\~'. which applies a strikethrough style style to the input markdown file, the output html file and the terminal output.
+1. "# " followed by the todo's name. Only alphabets, digits, and some special characters are allowed. Completed todos will appear with a strikethrough style in both the output HTML file and the terminal. To mark a todo as completed, either prefix it with '~' or enclose the name in '\~\~', which will also apply the strikethrough style to the input markdown file.
 1. "- @ ", followed by the todo's owner, optional
 1. "- : ", followed by the todo's dependency list, which can be split to multiple lines for easier editing, optional
 1. "- % ", followed by the todo's comment, optional

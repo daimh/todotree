@@ -19,7 +19,7 @@ fn main() -> ExitCode {
         "set output format to 'html', 'json', or 'term' (by default)",
         "FORMAT",
     );
-    opts.optflag("n", "nodone", "hide todos that are done");
+    opts.optflag("n", "hide", "hide todos that are completed");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "version", "print version");
     let matches = match opts.parse(&args[1..]) {
@@ -53,9 +53,9 @@ fn main() -> ExitCode {
     let tree = Tree::new(
         &input,
         targets,
-        matches.opt_present("n"),
         0,
         format.as_str(),
+        matches.opt_present("n"),
     );
     print!("{}", tree);
     ExitCode::SUCCESS
@@ -92,13 +92,8 @@ mod tests {
                 continue;
             }
             for format in vec!["html", "json", "term"] {
-                let tree = Tree::new(
-                    &md,
-                    &mut Vec::<String>::new(),
-                    false,
-                    80,
-                    format,
-                );
+                let tree =
+                    Tree::new(&md, &mut Vec::<String>::new(), 80, format, true);
                 let mut output = String::new();
                 match write!(output, "{}", tree) {
                     Ok(s) => s,
@@ -123,14 +118,29 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(
+        expected = "ERR-017: todo \"movie\" cannot be marked as completed \
+			because its dependencies [\"dinner\", \"lawn\"] are yet completed"
+    )]
+    fn test_017() {
+        Tree::new(
+            "src/tests/ERR-017.md",
+            &Vec::<String>::new(),
+            0,
+            "term",
+            true,
+        );
+    }
+
+    #[test]
     #[should_panic(expected = "ERR-016: duplicated todo name 'duplicated'")]
     fn test_016() {
         Tree::new(
             "src/tests/ERR-016.md",
             &Vec::<String>::new(),
-            false,
             0,
             "term",
+            true,
         );
     }
 
@@ -140,9 +150,9 @@ mod tests {
         Tree::new(
             "src/tests/ERR-007-1.md",
             &Vec::<String>::new(),
-            false,
             0,
             "term",
+            true,
         );
     }
 
@@ -152,9 +162,9 @@ mod tests {
         Tree::new(
             "src/tests/ERR-007-1.md",
             &vec![String::from("1")],
-            false,
             0,
             "term",
+            false,
         );
     }
 
@@ -164,9 +174,9 @@ mod tests {
         Tree::new(
             "src/tests/ERR-007-2.md",
             &vec![String::from("1")],
-            false,
             0,
             "term",
+            true,
         );
     }
 }

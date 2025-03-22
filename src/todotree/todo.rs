@@ -8,12 +8,18 @@ use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
+#[derive(PartialEq)]
+pub enum Status {
+    Completed,
+    Waiting,
+    Doing,
+}
+
 pub struct Todo {
     pub name: String,
     owner: String,
     comment: String,
-    done: bool,
-    wait: bool,
+    status: Status,
     pub dependencies: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
 }
@@ -25,10 +31,13 @@ impl Todo {
         comment: String,
         dependencies: Vec<String>,
     ) -> Self {
-        let done = name.starts_with("~~") && name.ends_with("~~");
-        let realname = match done {
-            true => name[2..name.len() - 2].to_string(),
-            false => name.clone(),
+        let status = match name.starts_with("~") {
+            true => Status::Completed,
+            false => Status::Waiting,
+        };
+        let realname = match status {
+            Status::Completed => String::from(name.replace("~", "").trim()),
+            _ => name.clone(),
         };
         static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
@@ -40,7 +49,8 @@ impl Todo {
                     || (c >= 'a' && c <= 'z')
                     || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9'),
-                "ERR-003: todo name '{}' contains some character '{}', which is not alphabet, digit, or {:?}",
+                "ERR-003: todo name '{}' contains some character '{}', \
+				which is not alphabet, digit, or {:?}",
                 name,
                 c,
                 SPECIALS
@@ -50,8 +60,7 @@ impl Todo {
             name: realname,
             owner: owner,
             comment: comment,
-            done: done,
-            wait: false,
+            status: status,
             dependencies: dependencies,
             children: Vec::new(),
         }
@@ -65,36 +74,56 @@ impl Todo {
         visited: &mut HashSet<String>,
         depth: usize,
         screen_width: usize,
-        nodone: bool,
+        hide: bool,
     ) {
-        self.wait = false;
+        let mut notdonedeps: Vec<&String> = vec![];
+        let mut alldone = true;
         for dep in &self.dependencies {
             assert!(
                 path.insert(dep.to_string()),
                 "ERR-007: Todo '{}' has a dependency loop",
                 self.name
             );
-            match map.get(dep) {
-                None => panic!("ERR-003: No such a Todo '{}'", dep),
-                Some(child) => {
-                    if visited.insert(dep.to_string())
-                        && (!child.borrow().done || !nodone)
-                    {
-                        self.children.push(Rc::clone(child));
-                        child.borrow_mut().build_tree(
-                            map,
-                            maxlens,
-                            path,
-                            visited,
-                            depth + 1,
-                            screen_width,
-                            nodone,
-                        );
-                    }
-                    self.wait = self.wait || !child.borrow().done;
+            let child = match map.get(dep) {
+                Some(x) => x,
+                None => {
+                    let todo = Todo::new(
+                        String::from(dep),
+                        String::new(),
+                        String::new(),
+                        Vec::new(),
+                    );
+                    &Rc::new(RefCell::new(todo))
                 }
             };
+            if child.borrow().status != Status::Completed {
+                notdonedeps.push(dep);
+            }
+            alldone = alldone && child.borrow().status == Status::Completed;
+            if visited.insert(dep.to_string()) {
+                self.children.push(Rc::clone(child));
+                child.borrow_mut().build_tree(
+                    map,
+                    maxlens,
+                    path,
+                    visited,
+                    depth + 1,
+                    screen_width,
+                    hide,
+                );
+            }
             path.remove(dep);
+        }
+        if notdonedeps.len() == 0 {
+            if self.status != Status::Completed {
+                self.status = Status::Doing;
+            }
+        } else if self.status == Status::Completed {
+            panic!(
+                "ERR-017: todo \"{}\" cannot be marked as completed \
+				because its dependencies {:?} are yet completed",
+                self.name, notdonedeps
+            );
         }
         if self.name == ROOT {
             if maxlens[1] > 0 {
@@ -132,12 +161,10 @@ impl Todo {
                 writeln!(fo, "{}{{", space)?;
                 writeln!(fo, "{}  \"name\": \"{}\",", space, self.name)?;
                 write!(fo, "{}  \"status\": ", space)?;
-                if self.done {
-                    writeln!(fo, "\"strikethrough\",")?;
-                } else if self.wait {
-                    writeln!(fo, "null,",)?;
-                } else {
-                    writeln!(fo, "\"red\",",)?;
+                match self.status {
+                    Status::Completed => writeln!(fo, "\"strikethrough\",")?,
+                    Status::Waiting => writeln!(fo, "null,",)?,
+                    Status::Doing => writeln!(fo, "\"red\",",)?,
                 }
                 if maxlens[1] > 0 {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
@@ -168,9 +195,9 @@ impl Todo {
                         write!(fo, "├──{}", space)?;
                     }
                 }
-                if self.done {
-                    //strikethrough
-                    write!(
+                match self.status {
+                    // strikethrough
+                    Status::Completed => write!(
                         fo,
                         "{}",
                         match format {
@@ -179,10 +206,9 @@ impl Todo {
                                 "<span style='text-decoration:line-through'>",
                             Format::Json => panic!("ERR-010"),
                         }
-                    )?;
-                } else if !self.wait {
-                    //red
-                    write!(
+                    )?,
+                    // red
+                    Status::Doing => write!(
                         fo,
                         "{}",
                         match format {
@@ -190,10 +216,12 @@ impl Todo {
                             Format::Html => "<span style='color:red'>",
                             Format::Json => panic!("ERR-011"),
                         }
-                    )?;
+                    )?,
+                    // red
+                    Status::Waiting => (),
                 }
                 write!(fo, "{}", self.name)?;
-                if self.done || !self.wait {
+                if self.status != Status::Waiting {
                     write!(
                         fo,
                         "{}",
