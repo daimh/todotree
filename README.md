@@ -2,8 +2,16 @@
 
 Display todos with a dependency tree. Highlight ongoing ones with red, or finished ones with strikethrough. Support terminal, html and json output format
 
-Example: it prints the screen below with the todotree markdown file [todotree.md](examples/todotree.md)
-![alt text](examples/todotree.png "Title")
+## Example 
+#### Input 
+markdown file [todotree.md](examples/todotree.md) 
+
+#### Output
+- Terminal
+![terminal](examples/todotree.png "Title")
+- [html](https://htmlpreview.github.io/?https://raw.githubusercontent.com/daimh/todotree/refs/heads/master/examples/output/todotree.html)
+- [json](examples/output/todotree.json)
+
 
 ## Installation
 
