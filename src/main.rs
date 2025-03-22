@@ -91,28 +91,40 @@ mod tests {
             if !md.ends_with(".md") {
                 continue;
             }
-            for format in vec!["html", "json", "term"] {
-                let tree =
-                    Tree::new(&md, &mut Vec::<String>::new(), 80, format, true);
-                let mut output = String::new();
-                match write!(output, "{}", tree) {
-                    Ok(s) => s,
-                    Err(e) => panic!("ERR-001: failed to write '{}'", e),
+            for hide in [false, true] {
+                for format in vec!["html", "json", "term"] {
+                    let tree = Tree::new(
+                        &md,
+                        &mut Vec::<String>::new(),
+                        80,
+                        format,
+                        hide,
+                    );
+                    let mut output = String::new();
+                    match write!(output, "{}", tree) {
+                        Ok(s) => s,
+                        Err(e) => panic!("ERR-001: failed to write '{}'", e),
+                    }
+					let outdir = match hide {
+						false => "examples/output/",
+						true => "examples/hide/",
+					};
+                    let basefile = md[0..md.len() - 3]
+                        .replace("examples/", outdir)
+                        + "."
+                        + format;
+                    let standard = match read_to_string(&basefile) {
+                        Ok(s) => s,
+                        Err(e) => panic!("ERR-002: '{}', {}", basefile, e),
+                    };
+                    assert!(
+                        standard == output,
+                        "ERR-015: md: {}, format: {}, hide: {}",
+                        &md,
+                        format,
+						hide,
+                    );
                 }
-                let basefile = md[0..md.len() - 3]
-                    .replace("examples/", "examples/output/")
-                    + "."
-                    + format;
-                let standard = match read_to_string(&basefile) {
-                    Ok(s) => s,
-                    Err(e) => panic!("ERR-002: '{}', {}", basefile, e),
-                };
-                assert!(
-                    standard == output,
-                    "ERR-015: md: {}, format: {}",
-                    &md,
-                    format
-                );
             }
         }
     }

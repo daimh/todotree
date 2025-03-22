@@ -20,28 +20,11 @@
         }
         ,
         {
-          "name": "garden",
-          "status": "strikethrough",
-          "owner": "Dad",
-          "comment": "before 6pm, fertilize the tomato bed, then plant it",
-          "dependencies": [
-          ]
-        }
-        ,
-        {
           "name": "lawn",
           "status": "red",
           "owner": "Avery",
           "comment": "at noon, mow the lawn",
           "dependencies": [
-            {
-              "name": "mower",
-              "status": "strikethrough",
-              "owner": "Brody",
-              "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
-              "dependencies": [
-              ]
-            }
           ]
         }
       ]

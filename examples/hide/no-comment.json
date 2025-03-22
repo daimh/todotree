@@ -1,0 +1,29 @@
+{
+  "name": "/",
+  "status": null,
+  "owner": "OWNER",
+  "dependencies": [
+    {
+      "name": "movie",
+      "status": null,
+      "owner": "family",
+      "dependencies": [
+        {
+          "name": "dinner",
+          "status": "red",
+          "owner": "Mom",
+          "dependencies": [
+          ]
+        }
+        ,
+        {
+          "name": "lawn",
+          "status": "red",
+          "owner": "Avery",
+          "dependencies": [
+          ]
+        }
+      ]
+    }
+  ]
+}

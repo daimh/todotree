@@ -77,7 +77,6 @@ impl Todo {
         hide: bool,
     ) {
         let mut notdonedeps: Vec<&String> = vec![];
-        let mut alldone = true;
         for dep in &self.dependencies {
             assert!(
                 path.insert(dep.to_string()),
@@ -96,12 +95,11 @@ impl Todo {
                     &Rc::new(RefCell::new(todo))
                 }
             };
-            if child.borrow().status != Status::Completed {
+            let dep_notdone = child.borrow().status != Status::Completed;
+            if dep_notdone {
                 notdonedeps.push(dep);
             }
-            alldone = alldone && child.borrow().status == Status::Completed;
             if visited.insert(dep.to_string()) {
-                self.children.push(Rc::clone(child));
                 child.borrow_mut().build_tree(
                     map,
                     maxlens,
@@ -111,6 +109,9 @@ impl Todo {
                     screen_width,
                     hide,
                 );
+                if dep_notdone || !hide {
+                    self.children.push(Rc::clone(child));
+                }
             }
             path.remove(dep);
         }
