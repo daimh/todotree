@@ -11,12 +11,12 @@ fn main() -> ExitCode {
         "i",
         "input",
         "use MARKDOWN file instead of 'todotree.md' as input",
-        "INPUT",
+        "MARKDOWN",
     );
     opts.optopt(
         "o",
         "format",
-        "set output format to 'html', 'json', or 'term' (by default)",
+        "set output FORMAT to 'html', 'json', or 'term' (by default)",
         "FORMAT",
     );
     opts.optflag("n", "hide", "hide todos that are completed");
@@ -78,117 +78,4 @@ fn print_usage(opts: &Options) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fmt::Write;
-    use std::fs;
-    use std::fs::read_to_string;
-
-    #[test]
-    fn test_main() {
-        for path in fs::read_dir("examples").unwrap() {
-            let md = path.unwrap().path().display().to_string();
-            if !md.ends_with(".md") {
-                continue;
-            }
-            for hide in [false, true] {
-                for format in vec!["html", "json", "term"] {
-                    let tree = Tree::new(
-                        &md,
-                        &mut Vec::<String>::new(),
-                        80,
-                        format,
-                        hide,
-                    );
-                    let mut output = String::new();
-                    match write!(output, "{}", tree) {
-                        Ok(s) => s,
-                        Err(e) => panic!("ERR-001: failed to write '{}'", e),
-                    }
-					let outdir = match hide {
-						false => "examples/output/",
-						true => "examples/hide/",
-					};
-                    let basefile = md[0..md.len() - 3]
-                        .replace("examples/", outdir)
-                        + "."
-                        + format;
-                    let standard = match read_to_string(&basefile) {
-                        Ok(s) => s,
-                        Err(e) => panic!("ERR-002: '{}', {}", basefile, e),
-                    };
-                    assert!(
-                        standard == output,
-                        "ERR-015: md: {}, format: {}, hide: {}",
-                        &md,
-                        format,
-						hide,
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "ERR-017: todo \"movie\" cannot be marked as completed \
-			because its dependencies [\"dinner\", \"lawn\"] are yet completed"
-    )]
-    fn test_017() {
-        Tree::new(
-            "src/tests/ERR-017.md",
-            &Vec::<String>::new(),
-            0,
-            "term",
-            true,
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "ERR-016: duplicated todo name 'duplicated'")]
-    fn test_016() {
-        Tree::new(
-            "src/tests/ERR-016.md",
-            &Vec::<String>::new(),
-            0,
-            "term",
-            true,
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "ERR-013: all todos are in a dependency loop")]
-    fn test_007() {
-        Tree::new(
-            "src/tests/ERR-007-1.md",
-            &Vec::<String>::new(),
-            0,
-            "term",
-            true,
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "ERR-007: Todo '1' has a dependency loop")]
-    fn test_007_1() {
-        Tree::new(
-            "src/tests/ERR-007-1.md",
-            &vec![String::from("1")],
-            0,
-            "term",
-            false,
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "ERR-007: Todo '3' has a dependency loop")]
-    fn test_007_2() {
-        Tree::new(
-            "src/tests/ERR-007-2.md",
-            &vec![String::from("1")],
-            0,
-            "term",
-            true,
-        );
-    }
-}
+mod tests;

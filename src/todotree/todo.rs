@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Status {
     Completed,
     Waiting,
@@ -19,7 +19,7 @@ pub struct Todo {
     pub name: String,
     owner: String,
     comment: String,
-    status: Status,
+    pub status: Status,
     pub dependencies: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
 }
@@ -49,8 +49,8 @@ impl Todo {
                     || (c >= 'a' && c <= 'z')
                     || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9'),
-                "ERR-003: todo name '{}' contains some character '{}', \
-				which is not alphabet, digit, or {:?}",
+                "ERR-003: Todo name '{}' contains some character '{}', \
+				which is not alphabet, digit, or {:?}.",
                 name,
                 c,
                 SPECIALS
@@ -76,30 +76,20 @@ impl Todo {
         screen_width: usize,
         hide: bool,
     ) {
-        let mut notdonedeps: Vec<&String> = vec![];
-        for dep in &self.dependencies {
+        let mut notdonedeps: Vec<String> = vec![];
+        for dep_raw in &self.dependencies {
+            let dep_nm = String::from(dep_raw.replace("~", "").trim());
             assert!(
-                path.insert(dep.to_string()),
-                "ERR-007: Todo '{}' has a dependency loop",
+                path.insert(dep_nm.clone()),
+                "ERR-007: Todo '{}' has a dependency loop.",
                 self.name
             );
-            let child = match map.get(dep) {
-                Some(x) => x,
-                None => {
-                    let todo = Todo::new(
-                        String::from(dep),
-                        String::new(),
-                        String::new(),
-                        Vec::new(),
-                    );
-                    &Rc::new(RefCell::new(todo))
-                }
-            };
+            let child = map.get(&dep_nm).unwrap();
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
-                notdonedeps.push(dep);
+                notdonedeps.push(dep_nm.clone());
             }
-            if visited.insert(dep.to_string()) {
+            if visited.insert(dep_nm.clone()) {
                 child.borrow_mut().build_tree(
                     map,
                     maxlens,
@@ -113,7 +103,7 @@ impl Todo {
                     self.children.push(Rc::clone(child));
                 }
             }
-            path.remove(dep);
+            path.remove(&dep_nm.clone());
         }
         if notdonedeps.len() == 0 {
             if self.status != Status::Completed {
@@ -121,8 +111,8 @@ impl Todo {
             }
         } else if self.status == Status::Completed {
             panic!(
-                "ERR-017: todo \"{}\" cannot be marked as completed \
-				because its dependencies {:?} are yet completed",
+                "ERR-017: Todo \"{}\" cannot be marked as completed \
+				because its dependencies {:?} are yet completed.",
                 self.name, notdonedeps
             );
         }
@@ -135,7 +125,7 @@ impl Todo {
             }
             assert!(
                 screen_width > maxlens[0] + maxlens[1] + 8,
-                "ERR-002: Screen is too narrow for this todotree markdown file"
+                "ERR-002: Screen is too narrow for this todotree markdown file."
             );
             maxlens[2] =
                 min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);
