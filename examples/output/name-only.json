@@ -15,7 +15,7 @@
         ,
         {
           "name": "garden",
-          "status": "strikethrough",
+          "status": "blue",
           "dependencies": [
           ]
         }
@@ -26,7 +26,7 @@
           "dependencies": [
             {
               "name": "mower",
-              "status": "strikethrough",
+              "status": "blue",
               "dependencies": [
               ]
             }

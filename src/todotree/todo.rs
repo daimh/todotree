@@ -1,19 +1,13 @@
-use crate::todotree::HTMLP;
-use crate::todotree::ROOT;
-use crate::todotree::tree::Format;
 use std::cell::RefCell;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::rc::Rc;
-
-#[derive(PartialEq, Debug)]
-pub enum Status {
-    Completed,
-    Waiting,
-    Doing,
-}
+use super::Format;
+use super::HTMLP;
+use super::ROOT;
+use super::Status;
 
 pub struct Todo {
     pub name: String,
@@ -33,7 +27,7 @@ impl Todo {
     ) -> Self {
         let status = match name.starts_with("~") {
             true => Status::Completed,
-            false => Status::Waiting,
+            false => Status::Pending,
         };
         let realname = match status {
             Status::Completed => String::from(name.replace("~", "").trim()),
@@ -107,7 +101,7 @@ impl Todo {
         }
         if notdonedeps.len() == 0 {
             if self.status != Status::Completed {
-                self.status = Status::Doing;
+                self.status = Status::Actionable;
             }
         } else if self.status == Status::Completed {
             panic!(
@@ -153,9 +147,9 @@ impl Todo {
                 writeln!(fo, "{}  \"name\": \"{}\",", space, self.name)?;
                 write!(fo, "{}  \"status\": ", space)?;
                 match self.status {
-                    Status::Completed => writeln!(fo, "\"strikethrough\",")?,
-                    Status::Waiting => writeln!(fo, "null,",)?,
-                    Status::Doing => writeln!(fo, "\"red\",",)?,
+                    Status::Completed => writeln!(fo, "\"blue\",")?,
+                    Status::Pending => writeln!(fo, "null,",)?,
+                    Status::Actionable => writeln!(fo, "\"red\",",)?,
                 }
                 if maxlens[1] > 0 {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
@@ -187,19 +181,19 @@ impl Todo {
                     }
                 }
                 match self.status {
-                    // strikethrough
+                    // blue
                     Status::Completed => write!(
                         fo,
                         "{}",
                         match format {
-                            Format::Term => "\x1b\x5b\x39\x6d",
+                            Format::Term => "\x1b\x5b\x33\x34\x6d",
                             Format::Html =>
-                                "<span style='text-decoration:line-through'>",
+                                "<span style='color:blue'>",
                             Format::Json => panic!("ERR-010"),
                         }
                     )?,
                     // red
-                    Status::Doing => write!(
+                    Status::Actionable => write!(
                         fo,
                         "{}",
                         match format {
@@ -209,10 +203,10 @@ impl Todo {
                         }
                     )?,
                     // red
-                    Status::Waiting => (),
+                    Status::Pending => (),
                 }
                 write!(fo, "{}", self.name)?;
-                if self.status != Status::Waiting {
+                if self.status != Status::Pending {
                     write!(
                         fo,
                         "{}",

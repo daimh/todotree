@@ -1,6 +1,6 @@
 # Todo Tree
 
-Display todos with a dependency tree. Highlight ongoing ones with red, or finished ones with strikethrough. Support terminal, html and json output format
+Display todos with a dependency tree. Highlight actionable ones with red, or finished ones with blue. Support terminal, html and json output format
 
 ## Example 
 #### Input 
@@ -43,13 +43,11 @@ todotree lawn garden
 todotree -o term -i name-only.md > name-only.term && cat name-only.term
 ```
 
-- save the output to other format
+- advanced usage
 ```
+watch -c todotree
 todotree -o html -i no-comment.md > no-comment.html
 todotree -o json -i no-owner.md > no-owner.json
-```
-- get help
-```
 todotree -h
 ```
 
@@ -59,7 +57,7 @@ RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 ```
 
 Each todo in the input markdown file is defined by four special lines
-1. "# " followed by the todo's name. Only alphabets, digits, and some special characters are allowed. Completed todos will appear with a strikethrough style in both the output HTML file and the terminal. To mark a todo as completed, either prefix it with '~' or enclose the name in '\~\~', which will also apply the strikethrough style to the input markdown file.
+1. "# " followed by the todo's name. Only alphabets, digits, and some special characters are allowed. Completed todos will have a blue color in both the output HTML file and the terminal. To mark a todo as completed, either prefix it with '~' or enclose the name in '\~\~', which will also apply the strikethrough style to the input markdown file.
 1. "- @ ", followed by the todo's owner, optional
 1. "- : ", followed by the todo's dependency list, which can be split to multiple lines for easier editing, optional
 1. "- % ", followed by the todo's comment, optional

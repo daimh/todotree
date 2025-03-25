@@ -1,20 +1,14 @@
-use crate::todotree::HTMLP;
-use crate::todotree::ROOT;
-use crate::todotree::todo::Status;
-use crate::todotree::todo::Todo;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
-
-#[derive(PartialEq)]
-pub enum Format {
-    Html,
-    Json,
-    Term,
-}
+use super::Format;
+use super::HTMLP;
+use super::ROOT;
+use super::Status;
+use super::todo::Todo;
 
 pub struct Tree {
     root: Rc<RefCell<Todo>>,

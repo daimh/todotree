@@ -18,7 +18,7 @@
         ,
         {
           "name": "garden",
-          "status": "strikethrough",
+          "status": "blue",
           "comment": "before 6pm, fertilize the tomato bed, then plant it",
           "dependencies": [
           ]
@@ -31,7 +31,7 @@
           "dependencies": [
             {
               "name": "mower",
-              "status": "strikethrough",
+              "status": "blue",
               "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
               "dependencies": [
               ]
