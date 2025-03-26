@@ -10,32 +10,45 @@ fn examples() {
         if !md.ends_with(".md") {
             continue;
         }
-        for hide in [false, true] {
-            for format in vec!["html", "json", "term"] {
-                let tree =
-                    Tree::new(&md, &mut Vec::<String>::new(), 80, format, hide);
+        for format in vec!["term", "json", "html"] {
+            for idx in 0..4 {
+                let (hide, depth, outdir) = match idx {
+                    0 => (false, 0, "examples/output/"),
+                    1 => (true, 0, "examples/hide/"),
+                    2 => (false, 2, "examples/depth/pos2/"),
+                    _ => (false, -1, "examples/depth/neg1/"),
+                };
+                let result = Tree::new(
+                    &md,
+                    &mut Vec::<String>::new(),
+                    80,
+                    format,
+                    hide,
+                    depth,
+                );
+                let tree = match result {
+                    Ok(t) => t,
+                    Err(e) => panic!("ERR-901: md: {}, e: {}", md, e),
+                };
                 let mut output = String::new();
                 match write!(output, "{}", tree) {
                     Ok(s) => s,
-                    Err(e) => panic!("ERR-001: Failed to write '{}'.", e),
+                    Err(e) => panic!("ERR-902: Failed to write '{}'.", e),
                 }
-                let outdir = match hide {
-                    false => "examples/output/",
-                    true => "examples/hide/",
-                };
                 let basefile = md[0..md.len() - 3].replace("examples/", outdir)
                     + "."
                     + format;
                 let standard = match read_to_string(&basefile) {
                     Ok(s) => s,
-                    Err(e) => panic!("ERR-002: '{}', {}.", basefile, e),
+                    Err(e) => panic!("ERR-903: '{}', {}.", basefile, e),
                 };
                 assert!(
                     standard == output,
-                    "ERR-015: md: {}, format: {}, hide: {}.",
+                    "ERR-904: md: {}, format: {}, hide: {}, depth: {}.",
                     &md,
                     format,
                     hide,
+                    depth,
                 );
             }
         }
@@ -43,85 +56,19 @@ fn examples() {
 }
 
 #[test]
-#[should_panic(expected = "ERR-019:")]
-fn err_019() {
-    Tree::new(
-        "src/tests/ERR-019.md",
-        &Vec::<String>::new(),
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-018:")]
-fn err_018() {
-    Tree::new(
-        "src/tests/ERR-018.md",
-        &Vec::<String>::new(),
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-017:")]
-fn err_017() {
-    Tree::new(
-        "src/tests/ERR-017.md",
-        &Vec::<String>::new(),
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-016:")]
-fn err_016() {
-    Tree::new(
-        "src/tests/ERR-016.md",
-        &Vec::<String>::new(),
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-013:")]
-fn err_007() {
-    Tree::new(
-        "src/tests/ERR-007-1.md",
-        &Vec::<String>::new(),
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-007:")]
-fn err_007_1() {
-    Tree::new(
-        "src/tests/ERR-007-1.md",
-        &vec![String::from("1")],
-        0,
-        "term",
-        false,
-    );
-}
-
-#[test]
-#[should_panic(expected = "ERR-007:")]
-fn err_007_2() {
-    Tree::new(
-        "src/tests/ERR-007-2.md",
-        &vec![String::from("1")],
-        0,
-        "term",
-        true,
-    );
+fn errors() {
+    for path in fs::read_dir("src/tests/").unwrap() {
+        let md = path.unwrap().path().display().to_string();
+        if !md.ends_with(".md") || !md.starts_with("src/tests/ERR-") {
+            continue;
+        }
+        let target = match md.len() {
+            20 => Vec::<String>::new(),
+            _ => vec![md[18..].replace(".md", ""); 1],
+        };
+        match Tree::new(&md, &target, 0, "term", false, 0) {
+            Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
+            _ => panic!("ERR-905"),
+        }
+    }
 }

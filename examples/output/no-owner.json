@@ -1,16 +1,16 @@
 {
   "name": "/",
-  "status": null,
+  "status": "Pending",
   "comment": "COMMENT",
   "dependencies": [
     {
       "name": "movie",
-      "status": null,
+      "status": "Pending",
       "comment": "at 7pm, arrive at the movie theater",
       "dependencies": [
         {
           "name": "dinner",
-          "status": "red",
+          "status": "Actionable",
           "comment": "at 6pm, we will eat",
           "dependencies": [
           ]
@@ -18,7 +18,7 @@
         ,
         {
           "name": "garden",
-          "status": "blue",
+          "status": "Completed",
           "comment": "before 6pm, fertilize the tomato bed, then plant it",
           "dependencies": [
           ]
@@ -26,12 +26,12 @@
         ,
         {
           "name": "lawn",
-          "status": "red",
+          "status": "Actionable",
           "comment": "at noon, mow the lawn",
           "dependencies": [
             {
               "name": "mower",
-              "status": "blue",
+              "status": "Completed",
               "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
               "dependencies": [
               ]

@@ -2,19 +2,16 @@
   "name": "/",
   "status": "Pending",
   "owner": "OWNER",
-  "comment": "COMMENT",
   "dependencies": [
     {
       "name": "movie",
       "status": "Pending",
       "owner": "family",
-      "comment": "at 7pm, arrive at the movie theater",
       "dependencies": [
         {
           "name": "dinner",
           "status": "Actionable",
           "owner": "Mom",
-          "comment": "at 6pm, we will eat",
           "dependencies": [
           ]
         }
@@ -23,25 +20,15 @@
           "name": "garden",
           "status": "Completed",
           "owner": "Dad",
-          "comment": "before 6pm, fertilize the tomato bed, then plant it",
           "dependencies": [
           ]
         }
         ,
         {
-          "name": "lawn",
+          "name": "lawn/",
           "status": "Actionable",
           "owner": "Avery",
-          "comment": "at noon, mow the lawn",
           "dependencies": [
-            {
-              "name": "mower",
-              "status": "Completed",
-              "owner": "Brody",
-              "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
-              "dependencies": [
-              ]
-            }
           ]
         }
       ]

@@ -1,16 +1,16 @@
 {
   "name": "/",
-  "status": null,
+  "status": "Pending",
   "owner": "OWNER",
   "dependencies": [
     {
       "name": "movie",
-      "status": null,
+      "status": "Pending",
       "owner": "family",
       "dependencies": [
         {
           "name": "dinner",
-          "status": "red",
+          "status": "Actionable",
           "owner": "Mom",
           "dependencies": [
           ]
@@ -18,7 +18,7 @@
         ,
         {
           "name": "garden",
-          "status": "blue",
+          "status": "Completed",
           "owner": "Dad",
           "dependencies": [
           ]
@@ -26,12 +26,12 @@
         ,
         {
           "name": "lawn",
-          "status": "red",
+          "status": "Actionable",
           "owner": "Avery",
           "dependencies": [
             {
               "name": "mower",
-              "status": "blue",
+              "status": "Completed",
               "owner": "Brody",
               "dependencies": [
               ]

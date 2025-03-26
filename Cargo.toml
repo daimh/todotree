@@ -2,6 +2,9 @@
 name = "todotree"
 version = "0.1.0"
 edition = "2024"
+authors = ["Manhong Dai"]
+license = "MIT"
+repository = "https://github.com/daimh/todotree.git"
 
 [dependencies]
 getopts = "0.2.21"

@@ -11,16 +11,7 @@
       "comment": "at 7pm, arrive at the movie theater",
       "dependencies": [
         {
-          "name": "dinner",
-          "status": "Actionable",
-          "owner": "Mom",
-          "comment": "at 6pm, we will eat",
-          "dependencies": [
-          ]
-        }
-        ,
-        {
-          "name": "lawn",
+          "name": "lawn/",
           "status": "Actionable",
           "owner": "Avery",
           "comment": "at noon, mow the lawn",

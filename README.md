@@ -38,16 +38,34 @@ todotree -n
 todotree lawn garden
 ```
 
+- Show todos up to 1 layer from root
+```
+todotree -d 1
+```
+
+- Show todos until 1 layer to leaf
+```
+todotree -d -1
+```
+
 - save the output as a file
 ```
 todotree -o term -i name-only.md > name-only.term && cat name-only.term
 ```
 
-- advanced usage
+- show the output while editing
 ```
 watch -c todotree
+```
+
+- other formats
+```
 todotree -o html -i no-comment.md > no-comment.html
 todotree -o json -i no-owner.md > no-owner.json
+```
+
+- help`
+```
 todotree -h
 ```
 

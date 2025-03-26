@@ -1,28 +1,16 @@
 {
   "name": "/",
   "status": "Pending",
-  "owner": "OWNER",
   "comment": "COMMENT",
   "dependencies": [
     {
       "name": "movie",
       "status": "Pending",
-      "owner": "family",
       "comment": "at 7pm, arrive at the movie theater",
       "dependencies": [
         {
-          "name": "dinner",
+          "name": "lawn/",
           "status": "Actionable",
-          "owner": "Mom",
-          "comment": "at 6pm, we will eat",
-          "dependencies": [
-          ]
-        }
-        ,
-        {
-          "name": "lawn",
-          "status": "Actionable",
-          "owner": "Avery",
           "comment": "at noon, mow the lawn",
           "dependencies": [
           ]

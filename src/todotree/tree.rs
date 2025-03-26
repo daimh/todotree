@@ -1,20 +1,21 @@
+use super::Format;
+use super::HTMLP;
+use super::ROOT;
+use super::Status;
+use super::TodoError;
+use super::todo::Todo;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
-use super::Format;
-use super::HTMLP;
-use super::ROOT;
-use super::Status;
-use super::todo::Todo;
 
 pub struct Tree {
     root: Rc<RefCell<Todo>>,
     format: Format,
     maxlens: [usize; 3],
-    map: HashMap<String, Rc<RefCell<Todo>>>,
+    dict: HashMap<String, Rc<RefCell<Todo>>>,
 }
 
 impl fmt::Display for Tree {
@@ -38,13 +39,18 @@ impl Tree {
         default_screen_width: usize,
         format: &str,
         hide: bool,
-    ) -> Self {
+        dpth_limit: i32,
+    ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
             "json" => Format::Json,
             "term" => Format::Term,
             "" => Format::Term,
-            _ => panic!("ERR-013: Wrong format string."),
+            _ => {
+                return Err(TodoError {
+                    msg: String::from("ERR-006: Wrong parameter for -f"),
+                });
+            }
         };
         let screen_width: usize = match format_enum {
             Format::Term => match default_screen_width {
@@ -62,24 +68,27 @@ impl Tree {
                 String::new(),
                 String::new(),
                 targets.to_vec(),
-            ))),
+            )?)),
             format: format_enum,
             maxlens: [0; 3],
-            map: HashMap::new(),
+            dict: HashMap::new(),
         };
-        let list = tree.readmd(mdfile);
+        let list = tree.readmd(mdfile)?;
         if tree.root.borrow().dependencies.len() == 0 {
             let mut noparent: HashSet<&String> =
-                HashSet::from_iter(tree.map.keys());
-            for todo in tree.map.values() {
+                HashSet::from_iter(tree.dict.keys());
+            for todo in tree.dict.values() {
                 for dep_raw in &todo.borrow().dependencies {
                     let dep_nm = String::from(dep_raw.replace("~", "").trim());
                     noparent.remove(&dep_nm);
                 }
-                assert!(
-                    noparent.len() > 0,
-                    "ERR-013: All todos are in a dependency loop."
-                );
+                if noparent.len() == 0 {
+                    return Err(TodoError {
+                        msg: String::from(
+                            "ERR-007: All todos are in a dependency loop.",
+                        ),
+                    });
+                }
             }
             for nm in list {
                 if noparent.contains(&nm) {
@@ -87,29 +96,34 @@ impl Tree {
                 }
             }
         }
-        tree.get_todos_in_dep_only();
+        tree.get_todos_in_dep_only()?;
         let mut path: HashSet<String> = HashSet::new();
         let mut visited: HashSet<String> = HashSet::new();
         tree.root.borrow_mut().build_tree(
-            &tree.map,
+            &tree.dict,
             &mut tree.maxlens,
             &mut path,
             &mut visited,
             0,
             screen_width,
             hide,
-        );
-        tree
+            dpth_limit,
+        )?;
+        Ok(tree)
     }
 
-    fn readmd(&mut self, mdfile: &str) -> Vec<String> {
+    fn readmd(&mut self, mdfile: &str) -> Result<Vec<String>, TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
         let mut comment = String::new();
         let mut dependencies: Vec<String> = Vec::new();
         let buffer = match read_to_string(mdfile) {
             Ok(md) => md,
-            Err(e) => panic!("ERR-008: '{}', {}.", mdfile, e),
+            Err(e) => {
+                return Err(TodoError {
+                    msg: format!("ERR-008: '{}', {}.", mdfile, e),
+                });
+            }
         };
         let mut list: Vec<String> = Vec::new();
         for ln in buffer.lines() {
@@ -120,13 +134,23 @@ impl Tree {
                     comment,
                     dependencies,
                     &mut list,
-                );
-                name = ln.get(2..).unwrap().trim().to_string();
-                assert!(
-                    name != "" && name != ROOT,
-                    "ERR-009: '{}' is a reserved Todo name keyword.",
-                    ROOT
-                );
+                )?;
+                name = match ln.get(2..) {
+                    Some(x) => x.trim().to_string(),
+                    _ => {
+                        return Err(TodoError {
+                            msg: format!("ERR-015: '{}'.", ln),
+                        });
+                    }
+                };
+                if name == "" || name == ROOT {
+                    return Err(TodoError {
+                        msg: format!(
+                            "ERR-009: '{}' is a reserved Todo name keyword.",
+                            ROOT
+                        ),
+                    });
+                }
                 owner = String::new();
                 comment = String::new();
                 dependencies = Vec::new();
@@ -145,32 +169,37 @@ impl Tree {
                 );
             }
         }
-        self.new_todo_if_any(name, owner, comment, dependencies, &mut list);
-        assert!(
-            self.map.len() > 0,
-            "ERR-004: The markdown file doesn't have any Todo."
-        );
-        list
+        self.new_todo_if_any(name, owner, comment, dependencies, &mut list)?;
+        match self.dict.len() {
+            0 => Err(TodoError {
+                msg: String::from(
+                    "ERR-010: The markdown file doesn't have any Todo.",
+                ),
+            }),
+            _ => Ok(list),
+        }
     }
 
-    fn get_todos_in_dep_only(&mut self) {
+    fn get_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
         let mut noparent: HashSet<&String> =
-            HashSet::from_iter(self.map.keys());
+            HashSet::from_iter(self.dict.keys());
         let mut todoindepsonly: HashMap<String, (String, Todo)> =
             HashMap::new();
-        for (key, todo) in &self.map {
+        for (key, todo) in &self.dict {
             for dep_raw in &todo.borrow().dependencies {
                 let dep_nm = String::from(dep_raw.replace("~", "").trim());
                 noparent.remove(&dep_nm);
                 let cur_completed = dep_raw.contains("~");
-                if self.map.contains_key(&dep_nm) {
+                if self.dict.contains_key(&dep_nm) {
                     if cur_completed {
-                        panic!(
-                            "ERR-018: Todo '{}' has its own '# ' line, \
+                        return Err(TodoError {
+                            msg: format!(
+                                "ERR-011: Todo '{}' has its own '# ' line, \
 									then it should not have '~' in '{}'s \
 									dependencies list.",
-                            dep_nm, key
-                        );
+                                dep_nm, key
+                            ),
+                        });
                     }
                     continue;
                 }
@@ -179,11 +208,14 @@ impl Tree {
                         let prv_completed =
                             parent_todo.1.status == Status::Completed;
                         if prv_completed != cur_completed {
-                            panic!(
-                                "ERR-019: Todo '{}' has a dependency '~{}', but \
-									todo '{}' has a dependency '{}'.",
-                                key, dep_nm, parent_todo.0, dep_nm
-                            );
+                            return Err(TodoError {
+                                msg: format!(
+                                    "ERR-012: Todo '{}' has a dependency \
+									'~{}', but todo '{}' has a dependency \
+									'{}'.",
+                                    key, dep_nm, parent_todo.0, dep_nm
+                                ),
+                            });
                         }
                     }
                     None => {
@@ -196,7 +228,7 @@ impl Tree {
                                     String::new(),
                                     String::new(),
                                     Vec::new(),
-                                ),
+                                )?,
                             ),
                         );
                     }
@@ -204,8 +236,9 @@ impl Tree {
             }
         }
         for (k, v) in todoindepsonly {
-            self.map.insert(k, Rc::new(RefCell::new(v.1)));
+            self.dict.insert(k, Rc::new(RefCell::new(v.1)));
         }
+        Ok(())
     }
 
     fn new_todo_if_any(
@@ -215,25 +248,32 @@ impl Tree {
         comment: String,
         dependencies: Vec<String>,
         list: &mut Vec<String>,
-    ) {
+    ) -> Result<(), TodoError> {
         if name == "" {
-            assert!(
-                owner == "" && comment == "" && dependencies.len() == 0,
-                "ERR-006: Missing '# [TODO]' before '- @', '- :', or '-  %' \
-				in the todotree markdown file."
-            );
-            return;
+            if owner == "" && comment == "" && dependencies.len() == 0 {
+                return Ok(());
+            } else {
+                return Err(TodoError {
+                    msg: String::from(
+                        "ERR-013: Missing '# [TODO]' before '- @', '- :', \
+						or '-  %' in the todotree markdown file.",
+                    ),
+                });
+            }
         }
-        let todo = Todo::new(name, owner, comment, dependencies);
+        let todo = Todo::new(name, owner, comment, dependencies)?;
         let nm = todo.name.clone();
         list.push(nm.clone());
         if self
-            .map
+            .dict
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))
             .is_some()
         {
-            panic!("ERR-016: Duplicated todo name '{}'.", nm)
+            return Err(TodoError {
+                msg: format!("ERR-014: Duplicated todo name '{}'.", nm),
+            });
         }
+        Ok(())
     }
 
     fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {

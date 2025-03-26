@@ -1,32 +1,32 @@
 {
   "name": "/",
-  "status": null,
+  "status": "Pending",
   "dependencies": [
     {
       "name": "movie",
-      "status": null,
+      "status": "Pending",
       "dependencies": [
         {
           "name": "dinner",
-          "status": "red",
+          "status": "Actionable",
           "dependencies": [
           ]
         }
         ,
         {
           "name": "garden",
-          "status": "blue",
+          "status": "Completed",
           "dependencies": [
           ]
         }
         ,
         {
           "name": "lawn",
-          "status": "red",
+          "status": "Actionable",
           "dependencies": [
             {
               "name": "mower",
-              "status": "blue",
+              "status": "Completed",
               "dependencies": [
               ]
             }

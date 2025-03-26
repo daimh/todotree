@@ -7,14 +7,7 @@
       "status": "Pending",
       "dependencies": [
         {
-          "name": "dinner",
-          "status": "Actionable",
-          "dependencies": [
-          ]
-        }
-        ,
-        {
-          "name": "lawn",
+          "name": "lawn/",
           "status": "Actionable",
           "dependencies": [
           ]

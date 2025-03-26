@@ -19,6 +19,12 @@ fn main() -> ExitCode {
         "set output FORMAT to 'html', 'json', or 'term' (by default)",
         "FORMAT",
     );
+    opts.optopt(
+        "d",
+        "depth",
+        "max display of the tree. Negative int removes the leaf nodes",
+        "DEPTH",
+    );
     opts.optflag("n", "hide", "hide todos that are completed");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "version", "print version");
@@ -45,24 +51,48 @@ fn main() -> ExitCode {
         Some(x) => x,
         None => String::new(),
     };
+    let depth: i32 = match matches.opt_str("d") {
+        Some(x) => match x.parse() {
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("{}", e.to_string());
+                return ExitCode::FAILURE;
+            }
+        },
+        None => 0,
+    };
     let free = &matches.free;
     let targets = match free.is_empty() {
         true => &vec![],
         false => free,
     };
-    let tree = Tree::new(
+    match Tree::new(
         &input,
         targets,
         0,
         format.as_str(),
         matches.opt_present("n"),
-    );
-    print!("{}", tree);
-    ExitCode::SUCCESS
+        depth,
+    ) {
+        Ok(tree) => {
+            print!("{}", tree);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            ExitCode::FAILURE
+        }
+    }
 }
 
 fn print_version() {
-    println!("20250319");
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const LICENSE: &str = env!("CARGO_PKG_LICENSE");
+    const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
+    println!(
+        "todotree {}, {} License, Copyright (c) {}",
+        VERSION, LICENSE, AUTHOR
+    );
 }
 
 fn print_usage(opts: &Options) {

@@ -9,15 +9,7 @@
       "owner": "family",
       "dependencies": [
         {
-          "name": "dinner",
-          "status": "Actionable",
-          "owner": "Mom",
-          "dependencies": [
-          ]
-        }
-        ,
-        {
-          "name": "lawn",
+          "name": "lawn/",
           "status": "Actionable",
           "owner": "Avery",
           "dependencies": [

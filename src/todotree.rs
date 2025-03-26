@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::fmt;
 mod todo;
 pub mod tree;
 static ROOT: &str = "/";
@@ -16,4 +18,28 @@ pub enum Status {
     Completed,
     Pending,
     Actionable,
+}
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Status::Completed => "Completed",
+                Status::Pending => "Pending",
+                Status::Actionable => "Actionable",
+            }
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct TodoError {
+    pub msg: String,
+}
+impl Error for TodoError {}
+impl fmt::Display for TodoError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
 }

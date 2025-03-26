@@ -1,16 +1,16 @@
 {
   "name": "/",
-  "status": null,
+  "status": "Pending",
   "comment": "COMMENT",
   "dependencies": [
     {
       "name": "movie",
-      "status": null,
+      "status": "Pending",
       "comment": "at 7pm, arrive at the movie theater",
       "dependencies": [
         {
           "name": "dinner",
-          "status": "red",
+          "status": "Actionable",
           "comment": "at 6pm, we will eat",
           "dependencies": [
           ]
@@ -18,7 +18,7 @@
         ,
         {
           "name": "lawn",
-          "status": "red",
+          "status": "Actionable",
           "comment": "at noon, mow the lawn",
           "dependencies": [
           ]
