@@ -1,3 +1,5 @@
+#!/usr/bin/env -S todotree -i
+
 # movie
 - : dinner garden lawn
 

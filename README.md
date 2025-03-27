@@ -64,7 +64,13 @@ todotree -o html -i no-comment.md > no-comment.html
 todotree -o json -i no-owner.md > no-owner.json
 ```
 
-- help`
+- run the executable md file
+```
+./name-only.md
+./no-comment.md
+```
+
+- help
 ```
 todotree -h
 ```
