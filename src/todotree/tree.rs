@@ -1,12 +1,7 @@
-use super::Format;
-use super::HTMLP;
-use super::ROOT;
-use super::Status;
-use super::TodoError;
-use super::todo::Todo;
+use super::{Format,HTMLP,ROOT,Status,TodoError,todo::Todo};
+use libc::{STDOUT_FILENO, TIOCGWINSZ, ioctl, winsize};
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap,HashSet};
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
@@ -36,7 +31,7 @@ impl Tree {
     pub fn new(
         mdfile: &str,
         targets: &[String],
-        default_screen_width: usize,
+        term_width: usize,
         format: &str,
         hide: bool,
         dpth_limit: i32,
@@ -52,15 +47,21 @@ impl Tree {
                 });
             }
         };
-        let screen_width: usize = match format_enum {
-            Format::Term => match default_screen_width {
-                0 => match termsize::get() {
-                    None => 80,
-                    Some(x) => x.cols.into(),
-                },
-                _ => default_screen_width,
-            },
-            _ => 80,
+        let mut screen_width: usize = 80;
+        if format_enum == Format::Term && term_width == 0 {
+            let mut ws = winsize {
+                ws_row: 0,
+                ws_col: 0,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            };
+            unsafe {
+                if ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) != -1
+                    && ws.ws_col > 0
+                {
+                    screen_width = ws.ws_col as usize;
+                }
+            }
         };
         let mut tree = Tree {
             root: Rc::new(RefCell::new(Todo::new(

@@ -1,10 +1,10 @@
 # Todo Tree
 
-Display todos with a dependency tree. Highlight actionable ones with red, or finished ones with blue. Support terminal, html and json output format
+Display todos with a dependency tree. Highlight actionable ones with red, or completed ones with blue. Support terminal, html and json output format
 
 ## Example 
 #### Input 
-markdown file [todotree.md](examples/todotree.md) 
+[todotree.md](examples/todotree.md) 
 
 #### Output
 - Terminal

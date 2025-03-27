@@ -8,4 +8,4 @@ repository = "https://github.com/daimh/todotree.git"
 
 [dependencies]
 getopts = "0.2.21"
-termsize = "0.1.9"
+libc = "0.2.171"

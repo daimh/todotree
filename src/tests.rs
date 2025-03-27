@@ -1,11 +1,10 @@
 use super::*;
 use std::fmt::Write;
-use std::fs;
-use std::fs::read_to_string;
+use std::fs::{read_dir,read_to_string};
 
 #[test]
 fn examples() {
-    for path in fs::read_dir("examples").unwrap() {
+    for path in read_dir("examples").unwrap() {
         let md = path.unwrap().path().display().to_string();
         if !md.ends_with(".md") {
             continue;
@@ -57,7 +56,7 @@ fn examples() {
 
 #[test]
 fn errors() {
-    for path in fs::read_dir("src/tests/").unwrap() {
+    for path in read_dir("src/tests/").unwrap() {
         let md = path.unwrap().path().display().to_string();
         if !md.ends_with(".md") || !md.starts_with("src/tests/ERR-") {
             continue;

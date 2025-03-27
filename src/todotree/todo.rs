@@ -1,12 +1,7 @@
-use super::Format;
-use super::HTMLP;
-use super::ROOT;
-use super::Status;
-use super::TodoError;
+use super::{Format,HTMLP,ROOT,Status,TodoError};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap,HashSet};
 use std::fmt;
 use std::rc::Rc;
 
@@ -133,11 +128,12 @@ impl Todo {
                 ),
             });
         }
-        if self.dependencies.len() > 0
+        if self.name != ROOT
+            && self.dependencies.len() > 0
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
                 || (dpth_limit < 0 && self.height + dpth_limit == 0))
         {
-            self.name.push_str("/")
+            self.name.push_str(ROOT)
         }
         if self.name == ROOT {
             if maxlens[1] > 0 {
@@ -148,9 +144,11 @@ impl Todo {
             }
             if screen_width <= maxlens[0] + maxlens[1] + 8 {
                 return Err(TodoError {
-                    msg: String::from(
-                        "ERR-005: Screen is too narrow for this todotree \
-						markdown file.",
+                    msg: format!(
+                        "ERR-005: Screen width is {}, but this todotree \
+						needs at least {} columns",
+                        screen_width,
+                        maxlens[0] + maxlens[1] + 8
                     ),
                 });
             }
