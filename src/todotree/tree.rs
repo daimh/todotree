@@ -155,9 +155,9 @@ impl Tree {
                 comment = String::new();
                 dependencies = Vec::new();
             } else if ln.starts_with("- @ ") {
-                owner = ln.get(4..).unwrap().trim().to_string();
+                self.add_line(&mut owner, ln);
             } else if ln.starts_with("- % ") {
-                comment = ln.get(4..).unwrap().trim().to_string();
+                self.add_line(&mut comment, ln);
             } else if ln.starts_with("- : ") {
                 dependencies.append(
                     &mut ln
@@ -306,5 +306,12 @@ impl Tree {
             }
         }
         Ok(())
+    }
+
+    fn add_line(&self, merged: &mut String, line: &str) {
+        if merged.len() > 0 {
+            merged.push_str(" ");
+        }
+        merged.push_str(line.get(4..).unwrap().trim())
     }
 }
