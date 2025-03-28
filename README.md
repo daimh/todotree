@@ -1,6 +1,14 @@
-# Todo Tree
+# TodoTree: Display Todos with a Dependency Tree
 
-Display todos with a dependency tree. Highlight actionable ones with red, or completed ones with blue. Support terminal, html and json output format
+TodoTree visualizes your tasks in a hierarchical structure, showing the complex relationships between them. Unlike typical to-do apps that display tasks as a flat list, TodoTree organizes your todos into a tree, inspired by the structure of a Makefile.
+
+- **Dependency Tree**: Todos are displayed in a tree format, showing dependencies between tasks.
+- **Actionable Todos**: Tasks that are actionable are highlighted in **red**, making them easy to spot.
+- **Pending Todos**: Tasks that are not actionable yet.
+- **Completed Todos**: Completed tasks are marked in **blue**, if they are taged with \~ in the input markdown file.
+- **Multiple Output Formats**: Supports output in terminal, HTML, and JSON formats.
+
+TodoTree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as completed (using `~` or enclosed in `~~`).
 
 ## Example 
 #### Input 
@@ -28,7 +36,7 @@ cd examples
 todotree 
 ```
 
-- hide the todos that were already done
+- hide the todos that were completed
 ```
 todotree -n
 ```
@@ -48,14 +56,21 @@ todotree -d 1
 todotree -d -1
 ```
 
+- merge lines with some string other than "\n"
+```
+todotree -i no-owner.md
+todotree -i no-owner.md -s "; "
+```
+
 - save the output as a file
 ```
 todotree -o term -i name-only.md > name-only.term && cat name-only.term
 ```
 
-- show the output while editing
+- show the output on the fly while editing
 ```
 watch -c todotree
+while clear; todotree; sleep 2; done
 ```
 
 - other formats
@@ -80,17 +95,21 @@ todotree -h
 RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 ```
 
-Each todo in the input markdown file is defined by four special lines
-1. "# " followed by the todo's name. Only alphabets, digits, and some special characters are allowed. Completed todos will have a blue color in both the output HTML file and the terminal. To mark a todo as completed, either prefix it with '~' or enclose the name in '\~\~', which will also apply the strikethrough style to the input markdown file.
-1. "- @ ", followed by the todo's owner, optional
-1. "- : ", followed by the todo's dependency list, which can be split to multiple lines for easier editing, optional
-1. "- % ", followed by the todo's comment, optional
+## Todo Format for Markdown Input
 
-## My 2 Cents
-This todo tree is a typical Graph structure, which is a little challenging for memory-safe Rust. I use Rc\<RefCell\<T>> to store the relation in the Graph, while avoiding either Unsafe or lifetime annotation. RefCell does have some runtime cost, However, I feel the debugging is easier than C/C++.
+Each to-do item in the input markdown file is defined by four special lines:
+
+1. **`# <todo-name>`**: The task name, consisting of alphabets, digits, and some special characters. Completed tasks will be displayed in **blue** in both the output HTML file and terminal. To mark a task as completed, prefix it with `~` or enclose it in `~~`, which will also apply a strikethrough style in the markdown file.
+   
+2. **`- @<owner>`**: The optional owner of the to-do. This field allows you to assign responsibility to a specific person or team.
+   
+3. **`- :<dependencies>`**: An optional list of dependencies for the to-do, which can span multiple lines for easier editing. This allows you to track tasks that must be completed before others.
+   
+4. **`- %<comment>`**: An optional comment or note related to the to-do, providing additional context or details. It can span multiple lines too
+
 
 ## License
 The MIT License
 
 ## Contributing
-Feel free to send me a pull request
+Feel free to send me a pull/feature request

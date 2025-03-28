@@ -1,6 +1,6 @@
 use super::*;
 use std::fmt::Write;
-use std::fs::{read_dir,read_to_string};
+use std::fs::{read_dir, read_to_string};
 
 #[test]
 fn examples() {
@@ -24,6 +24,7 @@ fn examples() {
                     format,
                     hide,
                     depth,
+                    "\n",
                 );
                 let tree = match result {
                     Ok(t) => t,
@@ -65,7 +66,7 @@ fn errors() {
             20 => Vec::<String>::new(),
             _ => vec![md[18..].replace(".md", ""); 1],
         };
-        match Tree::new(&md, &target, 0, "term", false, 0) {
+        match Tree::new(&md, &target, 0, "term", false, 0, " ") {
             Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
             _ => panic!("ERR-905"),
         }

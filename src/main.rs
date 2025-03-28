@@ -25,6 +25,12 @@ fn main() -> ExitCode {
         "max display of the tree. Negative int removes the leaf nodes",
         "DEPTH",
     );
+    opts.optopt(
+        "s",
+        "separator",
+        "use STRING instead of \"\\n\" as separator when  merging multiple lines",
+        "STRING",
+    );
     opts.optflag("n", "hide", "hide todos that are completed");
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("", "version", "print version");
@@ -66,6 +72,10 @@ fn main() -> ExitCode {
         true => &vec![],
         false => free,
     };
+    let separator = match matches.opt_str("s") {
+        Some(x) => x,
+        None => String::from("\n"),
+    };
     match Tree::new(
         &input,
         targets,
@@ -73,6 +83,7 @@ fn main() -> ExitCode {
         format.as_str(),
         matches.opt_present("n"),
         depth,
+        separator.as_str(),
     ) {
         Ok(tree) => {
             print!("{}", tree);
