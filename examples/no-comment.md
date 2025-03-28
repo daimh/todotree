@@ -18,9 +18,5 @@ Remember to explore the option of planting cucumber
 - @ Avery
 - : mower
 
-We cannot do it too early because the grass is too wet in morning
-
 # ~~mower~~
 - @ Brody
-
-Likely, the mower is running out of gas.

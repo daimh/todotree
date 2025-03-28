@@ -1,25 +1,25 @@
-use super::{Format,HTMLP,ROOT,Status,TodoError};
+use super::{Format, HTMLP, ROOT, Status, TodoError};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::{HashMap,HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::rc::Rc;
 
 pub struct Todo {
     pub name: String,
     owner: String,
-    comment: String,
-    pub status: Status,
+    comment: Vec<String>,
     pub dependencies: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
     height: i32,
+    pub status: Status,
 }
 
 impl Todo {
     pub fn new(
         name: String,
         owner: String,
-        comment: String,
+        comment: Vec<String>,
         dependencies: Vec<String>,
     ) -> Result<Self, TodoError> {
         let status = match name.starts_with("~") {
@@ -113,7 +113,7 @@ impl Todo {
                     self.children.push(Rc::clone(child));
                 }
             }
-            path.remove(&dep_nm.clone());
+            path.remove(&dep_nm);
         }
         if notdonedeps.len() == 0 {
             if self.status != Status::Completed {
@@ -128,20 +128,42 @@ impl Todo {
                 ),
             });
         }
-        if self.name != ROOT
-            && self.dependencies.len() > 0
+        if self.name == ROOT {
+            self.get_maxlens(maxlens, 0, screen_width)?;
+        } else if self.dependencies.len() > 0
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
                 || (dpth_limit < 0 && self.height + dpth_limit == 0))
         {
             self.name.push_str(ROOT)
+        }
+        Ok(())
+    }
+
+    pub fn get_maxlens(
+        &mut self,
+        maxlens: &mut [usize; 3],
+        depth: usize,
+        screen_width: usize,
+    ) -> Result<(), TodoError> {
+        for child in &self.children {
+            child
+                .borrow_mut()
+                .get_maxlens(maxlens, depth + 1, screen_width)?;
         }
         if self.name == ROOT {
             if maxlens[1] > 0 {
                 self.owner = String::from("OWNER")
             }
             if maxlens[2] > 0 {
-                self.comment = String::from("COMMENT")
+                self.comment = vec![String::from("COMMENT"); 1];
             }
+        }
+        maxlens[0] = max(maxlens[0], depth * 4 + self.name.len());
+        maxlens[1] = max(maxlens[1], self.owner.len());
+        for line in &self.comment {
+            maxlens[2] = max(maxlens[2], line.len());
+        }
+        if self.name == ROOT {
             if screen_width <= maxlens[0] + maxlens[1] + 8 {
                 return Err(TodoError {
                     msg: format!(
@@ -155,9 +177,6 @@ impl Todo {
             maxlens[2] =
                 min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);
         }
-        maxlens[0] = max(maxlens[0], depth * 4 + self.name.len());
-        maxlens[1] = max(maxlens[1], self.owner.len());
-        maxlens[2] = max(maxlens[2], self.comment.len());
         Ok(())
     }
 
@@ -178,18 +197,19 @@ impl Todo {
                 if maxlens[1] > 0 {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
                 }
-                if maxlens[2] > 0 {
+                if maxlens[2] > 0 && self.comment.len() > 0 {
                     writeln!(
                         fo,
                         "{}  \"comment\": \"{}\",",
-                        space, self.comment
+                        space, self.comment[0]
                     )?;
                 }
                 writeln!(fo, "{}  \"dependencies\": [", space)?;
             }
             Format::Term => {
                 space = String::from(" ");
-                self.fmt_connector(fo, connectors, &space)?;
+                let bol = String::new();
+                self.fmt_connector(fo, connectors, &space, &bol)?;
                 match self.status {
                     Status::Completed => write!(fo, "\x1b\x5b\x33\x34\x6d")?,
                     Status::Actionable => write!(fo, "\x1b\x5b\x33\x31\x6d")?,
@@ -199,12 +219,14 @@ impl Todo {
                 if self.status != Status::Pending {
                     write!(fo, "\x1b\x28\x42\x1b\x5b\x6d")?;
                 }
-                self.fmt_table(fo, connectors, &space, maxlens, format)?;
+                let eol = String::from("\n");
+                self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
             }
             Format::Html => {
                 space = String::from("&nbsp;");
-                write!(fo, "{}", HTMLP)?;
-                self.fmt_connector(fo, connectors, &space)?;
+                let bol = String::from(HTMLP);
+                let eol = String::from("</p>\n");
+                self.fmt_connector(fo, connectors, &space, &bol)?;
                 match self.status {
                     Status::Completed => {
                         write!(fo, "<span style='color:blue'>")?
@@ -218,7 +240,7 @@ impl Todo {
                 if self.status != Status::Pending {
                     write!(fo, "</span>")?;
                 }
-                self.fmt_table(fo, connectors, &space, maxlens, format)?;
+                self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
             }
         }
         for (pos, child) in self.children.iter().enumerate() {
@@ -241,7 +263,9 @@ impl Todo {
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
         space: &String,
+        bol: &String,
     ) -> fmt::Result {
+        write!(fo, "{}", bol)?;
         for (pos, cn) in connectors.iter().enumerate() {
             if *cn {
                 if pos + 1 < connectors.len() {
@@ -262,104 +286,144 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
-        space: &String,
         maxlens: &[usize; 3],
-        format: &Format,
+        space: &String,
+        bol: &String,
+        eol: &String,
     ) -> fmt::Result {
-        match maxlens[1] + maxlens[2] {
-            0 => writeln!(fo),
-            _ => {
+        if maxlens[1] + maxlens[2] == 0 {
+            write!(fo, "{}", eol)?;
+        } else {
+            write!(
+                fo,
+                "{}",
+                space.repeat(
+                    maxlens[0] - connectors.len() * 4 - self.name.len()
+                )
+            )?;
+            write!(fo, "{}│{}", space, space)?;
+            if maxlens[1] > 0 {
                 write!(
                     fo,
-                    "{}",
-                    space.repeat(
-                        maxlens[0] - connectors.len() * 4 - self.name.len()
-                    )
+                    "{}{}│",
+                    self.owner,
+                    space.repeat(1 + maxlens[1] - self.owner.len())
                 )?;
-                write!(fo, "{}│{}", space, space)?;
-                write!(fo, "{}", self.owner)?;
-                write!(fo, "{}", space.repeat(maxlens[1] - self.owner.len()))?;
-                if maxlens[1] > 0 && maxlens[2] > 0 {
-                    write!(fo, "{}│{}", space, space)?;
+                if maxlens[2] > 0 {
+                    write!(fo, "{}", space)?;
                 }
-                self.fmt_comment(fo, connectors, &mut 0, maxlens, format)
             }
+            if maxlens[2] > 0 {
+                self.fmt_comment(fo, connectors, maxlens, space, bol, eol)?;
+            } else {
+                write!(fo, "{}", eol)?;
+                self.fmt_cont_comment_or_dash(
+                    fo, connectors, maxlens, &space, &bol, false,
+                )?;
+            }
+            write!(fo, "{}", eol)?;
         }
+        Ok(())
+    }
+
+    fn fmt_cont_comment_or_dash(
+        &self,
+        fo: &mut fmt::Formatter<'_>,
+        connectors: &Vec<bool>,
+        maxlens: &[usize; 3],
+        space: &String,
+        bol: &String,
+        iscomment: bool,
+    ) -> fmt::Result {
+        write!(fo, "{}", bol)?;
+        for b in connectors {
+            match *b {
+                true => write!(fo, "{}", space)?,
+                false => write!(fo, "│")?,
+            };
+            write!(fo, "{}", space.repeat(3))?;
+        }
+        match self.children.len() {
+            0 => write!(fo, "{}", space),
+            _ => write!(fo, "│"),
+        }?;
+        write!(
+            fo,
+            "{}",
+            space.repeat(maxlens[0] - 1 - connectors.len() * 4)
+        )?;
+        if iscomment {
+            write!(fo, "{}│{}", space, space)?;
+            write!(fo, "{}", space.repeat(maxlens[1]))?;
+            if maxlens[1] > 0 && maxlens[2] > 0 {
+                write!(fo, "{}│{}", space, space)?;
+            }
+        } else {
+            let mut last = self.children.len() == 0;
+            if last {
+                for b in connectors {
+                    last = *b;
+                    if !last {
+                        break;
+                    }
+                }
+            }
+            match last {
+                false => write!(fo, "{}├─", space),
+                true => write!(fo, "{}└─", space),
+            }?;
+            write!(fo, "{}", "─".repeat(maxlens[1]))?;
+            if maxlens[1] > 0 && maxlens[2] > 0 {
+                match last {
+                    false => write!(fo, "─┼─"),
+                    true => write!(fo, "─┴─"),
+                }?;
+            }
+            write!(fo, "{}", "─".repeat(maxlens[2]))?;
+            match last {
+                false => write!(fo, "─┤"),
+                true => write!(fo, "─┘"),
+            }?;
+        }
+        Ok(())
     }
 
     fn fmt_comment(
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
-        start: &mut usize,
         maxlens: &[usize; 3],
-        format: &Format,
+        space: &String,
+        bol: &String,
+        eol: &String,
     ) -> fmt::Result {
-        let mut last = self.children.len() == 0;
-        if last {
-            for b in connectors {
-                last = *b;
-                if !last {
+		let comt = match self.comment.len() {
+			0 => &vec![String::new(); 1],
+			_ => &self.comment,
+		};
+        for (idx, line) in comt.iter().enumerate() {
+            if idx > 0 {
+                self.fmt_cont_comment_or_dash(
+                    fo, connectors, maxlens, space, bol, true,
+                )?;
+            }
+            let mut start = 0;
+            loop {
+                let slen = min(line.len() - start, maxlens[2]);
+                write!(fo, "{}", &line[start..start + slen])?;
+                write!(fo, "{}", space.repeat(maxlens[2] - slen))?;
+                write!(fo, "{}│{}", space, eol)?;
+                start = start + slen;
+                if start >= line.len() {
                     break;
                 }
+                self.fmt_cont_comment_or_dash(
+                    fo, connectors, maxlens, space, bol, true,
+                )?;
             }
         }
-        let (space, eol) = match format {
-            Format::Html => (String::from("&nbsp;"), format!("</p>\n")),
-            _ => (String::from(" "), String::from("\n")),
-        };
-        loop {
-            let slen = min(self.comment.len() - *start, maxlens[2]);
-            write!(fo, "{}", &self.comment[*start..*start + slen])?;
-            write!(fo, "{}", space.repeat(maxlens[2] - slen))?;
-            write!(fo, "{}│{}", space, eol)?;
-            if *format == Format::Html {
-                write!(fo, "{}", HTMLP)?;
-            }
-            *start = *start + slen;
-            for b in connectors {
-                match *b {
-                    true => write!(fo, "{}", space)?,
-                    false => write!(fo, "│")?,
-                };
-                write!(fo, "{}", space.repeat(3))?;
-            }
-            match self.children.len() {
-                0 => write!(fo, "{}", space),
-                _ => write!(fo, "│"),
-            }?;
-            write!(
-                fo,
-                "{}",
-                space.repeat(maxlens[0] - 1 - connectors.len() * 4)
-            )?;
-            if *start < self.comment.len() {
-                write!(fo, "{}│{}", space, space)?;
-                write!(fo, "{}", space.repeat(maxlens[1]))?;
-                if maxlens[1] > 0 && maxlens[2] > 0 {
-                    write!(fo, "{}│{}", space, space)?;
-                }
-            } else {
-                match last {
-                    false => write!(fo, "{}├─", space),
-                    true => write!(fo, "{}└─", space),
-                }?;
-                write!(fo, "{}", "─".repeat(maxlens[1]))?;
-                if maxlens[1] > 0 && maxlens[2] > 0 {
-                    match last {
-                        false => write!(fo, "─┼─"),
-                        true => write!(fo, "─┴─"),
-                    }?;
-                }
-                write!(fo, "{}", "─".repeat(maxlens[2]))?;
-                match last {
-                    false => write!(fo, "─┤"),
-                    true => write!(fo, "─┘"),
-                }?;
-                write!(fo, "{}", eol)?;
-                break;
-            }
-        }
-        Ok(())
+        self.fmt_cont_comment_or_dash(
+            fo, connectors, maxlens, space, bol, false,
+        )
     }
 }

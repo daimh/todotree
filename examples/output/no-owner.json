@@ -32,7 +32,7 @@
             {
               "name": "mower",
               "status": "Completed",
-              "comment": "before noon, test the mower. Don't do it too early, as it might wake up neighbors",
+              "comment": "before noon, test the mower.",
               "dependencies": [
               ]
             }

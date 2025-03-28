@@ -1,7 +1,7 @@
-use super::{Format,HTMLP,ROOT,Status,TodoError,todo::Todo};
+use super::{Format, HTMLP, ROOT, Status, TodoError, todo::Todo};
 use libc::{STDOUT_FILENO, TIOCGWINSZ, ioctl, winsize};
 use std::cell::RefCell;
-use std::collections::{HashMap,HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
@@ -11,6 +11,7 @@ pub struct Tree {
     format: Format,
     maxlens: [usize; 3],
     dict: HashMap<String, Rc<RefCell<Todo>>>,
+    separator: String,
 }
 
 impl fmt::Display for Tree {
@@ -35,6 +36,7 @@ impl Tree {
         format: &str,
         hide: bool,
         dpth_limit: i32,
+        separator: &str,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -67,12 +69,13 @@ impl Tree {
             root: Rc::new(RefCell::new(Todo::new(
                 String::from(ROOT),
                 String::new(),
-                String::new(),
+                Vec::new(),
                 targets.to_vec(),
             )?)),
             format: format_enum,
             maxlens: [0; 3],
             dict: HashMap::new(),
+            separator: String::from(separator),
         };
         let list = tree.readmd(mdfile)?;
         if tree.root.borrow().dependencies.len() == 0 {
@@ -116,7 +119,7 @@ impl Tree {
     fn readmd(&mut self, mdfile: &str) -> Result<Vec<String>, TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
-        let mut comment = String::new();
+        let mut comment: Vec<String> = Vec::new();
         let mut dependencies: Vec<String> = Vec::new();
         let buffer = match read_to_string(mdfile) {
             Ok(md) => md,
@@ -153,17 +156,21 @@ impl Tree {
                     });
                 }
                 owner = String::new();
-                comment = String::new();
+                comment = Vec::new();
                 dependencies = Vec::new();
-            } else if ln.starts_with("- @ ") {
-                self.add_line(&mut owner, ln);
-            } else if ln.starts_with("- % ") {
-                self.add_line(&mut comment, ln);
-            } else if ln.starts_with("- : ") {
+            } else if ln.starts_with("- @") {
+                if owner.len() > 0 {
+                    owner.push_str(" ");
+                }
+                owner.push_str(ln.get(3..).unwrap().trim())
+            } else if ln.starts_with("- %") {
+                comment.push(ln.get(3..).unwrap().trim().to_string());
+            } else if ln.starts_with("- :") {
                 dependencies.append(
                     &mut ln
-                        .get(4..)
+                        .get(3..)
                         .unwrap()
+                        .trim()
                         .split_whitespace()
                         .map(str::to_string)
                         .collect::<Vec<String>>(),
@@ -227,7 +234,7 @@ impl Tree {
                                 Todo::new(
                                     dep_raw.clone(),
                                     String::new(),
-                                    String::new(),
+                                    Vec::new(),
                                     Vec::new(),
                                 )?,
                             ),
@@ -246,12 +253,12 @@ impl Tree {
         &mut self,
         name: String,
         owner: String,
-        comment: String,
+        comment: Vec<String>,
         dependencies: Vec<String>,
         list: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         if name == "" {
-            if owner == "" && comment == "" && dependencies.len() == 0 {
+            if owner == "" && comment.len() == 0 && dependencies.len() == 0 {
                 return Ok(());
             } else {
                 return Err(TodoError {
@@ -262,7 +269,13 @@ impl Tree {
                 });
             }
         }
-        let todo = Todo::new(name, owner, comment, dependencies)?;
+        let comt: Vec<String> = match self.separator.as_str() {
+            "\n" => comment,
+            _ => {
+                vec![comment.join(self.separator.as_str()); 1]
+            }
+        };
+        let todo = Todo::new(name, owner, comt, dependencies)?;
         let nm = todo.name.clone();
         list.push(nm.clone());
         if self
@@ -307,12 +320,5 @@ impl Tree {
             }
         }
         Ok(())
-    }
-
-    fn add_line(&self, merged: &mut String, line: &str) {
-        if merged.len() > 0 {
-            merged.push_str(" ");
-        }
-        merged.push_str(line.get(4..).unwrap().trim())
     }
 }
