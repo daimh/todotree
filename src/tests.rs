@@ -9,14 +9,14 @@ fn examples() {
         if !md.ends_with(".md") {
             continue;
         }
-        for format in vec!["term", "json", "html"] {
-            for idx in 0..4 {
-                let (hide, depth, outdir) = match idx {
-                    0 => (false, 0, "examples/output/"),
-                    1 => (true, 0, "examples/hide/"),
-                    2 => (false, 2, "examples/depth/pos2/"),
-                    _ => (false, -1, "examples/depth/neg1/"),
-                };
+        for idx in 0..4 {
+            let (hide, depth, outdir) = match idx {
+                0 => (false, 0, "examples/output/"),
+                1 => (true, 0, "examples/hide/"),
+                2 => (false, 2, "examples/depth/pos2/"),
+                _ => (false, -1, "examples/depth/neg1/"),
+            };
+            for format in vec!["term", "json", "html"] {
                 let result = Tree::new(
                     &md,
                     &mut Vec::<String>::new(),

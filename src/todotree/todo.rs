@@ -397,10 +397,10 @@ impl Todo {
         bol: &String,
         eol: &String,
     ) -> fmt::Result {
-		let comt = match self.comment.len() {
-			0 => &vec![String::new(); 1],
-			_ => &self.comment,
-		};
+        let comt = match self.comment.len() {
+            0 => &vec![String::new(); 1],
+            _ => &self.comment,
+        };
         for (idx, line) in comt.iter().enumerate() {
             if idx > 0 {
                 self.fmt_cont_comment_or_dash(
