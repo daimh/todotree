@@ -10,6 +10,7 @@ pub struct Todo {
     owner: String,
     comment: Vec<String>,
     pub dependencies: Vec<String>,
+    auxilaries: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
     height: i32,
     pub status: Status,
@@ -21,6 +22,7 @@ impl Todo {
         owner: String,
         comment: Vec<String>,
         dependencies: Vec<String>,
+        auxilaries: Vec<String>,
     ) -> Result<Self, TodoError> {
         let status = match name.starts_with("~") {
             true => Status::Completed,
@@ -30,9 +32,9 @@ impl Todo {
             Status::Completed => String::from(name.replace("~", "").trim()),
             _ => name.clone(),
         };
-        static SPECIALS: [char; 17] = [
+        static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
-            '\'', '"', '.', '?',
+            '\'', '"', '.', '?', '/',
         ];
         if realname != ROOT {
             for c in realname.chars() {
@@ -51,12 +53,17 @@ impl Todo {
                 }
             }
         }
+        let realauxl = match auxilaries.len() {
+            0 => vec![String::new(); 1],
+            _ => auxilaries,
+        };
         Ok(Todo {
             name: realname,
             owner: owner,
             comment: comment,
             status: status,
             dependencies: dependencies,
+            auxilaries: realauxl,
             children: Vec::new(),
             height: 0,
         })
@@ -64,14 +71,15 @@ impl Todo {
 
     pub fn build_tree(
         &mut self,
+        visited: &mut HashSet<String>,
         map: &HashMap<String, Rc<RefCell<Todo>>>,
         maxlens: &mut [usize; 3],
         path: &mut HashSet<String>,
-        visited: &mut HashSet<String>,
         depth: usize,
         screen_width: usize,
         hide: bool,
         dpth_limit: i32,
+        format: &Format,
     ) -> Result<(), TodoError> {
         let mut notdonedeps: Vec<String> = vec![];
         for dep_raw in &self.dependencies {
@@ -86,25 +94,33 @@ impl Todo {
             }
             let child = match map.get(&dep_nm) {
                 Some(x) => x,
-                _ => panic!("ERR-003: {} is missing", &dep_nm),
+                _ => {
+                    return Err(TodoError {
+                        msg: format!(
+                            "ERR-003: Todo {} is missing in the markdown file",
+                            &dep_nm
+                        ),
+                    });
+                }
             };
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
                 notdonedeps.push(dep_nm.clone());
             }
-            if (dpth_limit <= 0 || dpth_limit > depth as i32)
-                && visited.insert(dep_nm.clone())
-            {
-                child.borrow_mut().build_tree(
-                    map,
-                    maxlens,
-                    path,
-                    visited,
-                    depth + 1,
-                    screen_width,
-                    hide,
-                    dpth_limit,
-                )?;
+            if dpth_limit <= 0 || dpth_limit > depth as i32 {
+                if visited.insert(child.borrow().name.clone()) {
+                    child.borrow_mut().build_tree(
+                        visited,
+                        map,
+                        maxlens,
+                        path,
+                        depth + 1,
+                        screen_width,
+                        hide,
+                        dpth_limit,
+                        format,
+                    )?;
+                }
                 let child_height = child.borrow().height;
                 self.height = max(child_height + 1, self.height);
                 if (dpth_limit >= 0 || child_height + dpth_limit >= 0)
@@ -131,6 +147,7 @@ impl Todo {
         if self.name == ROOT {
             self.get_maxlens(maxlens, 0, screen_width)?;
         } else if self.dependencies.len() > 0
+            && !self.name.ends_with(ROOT)
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
                 || (dpth_limit < 0 && self.height + dpth_limit == 0))
         {
@@ -184,11 +201,38 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
+        visited: &mut HashSet<String>,
         maxlens: &[usize; 3],
         format: &Format,
     ) -> fmt::Result {
         let space: String;
         match format {
+            Format::Md => {
+                space = String::from("Panic");
+                if self.name != "/" {
+                    write!(fo, "# ")?;
+                    if self.status == Status::Completed {
+                        write!(fo, "~")?;
+                    }
+                    writeln!(fo, "{}", self.name)?;
+                    if self.owner != "" {
+                        writeln!(fo, "- @ {}", self.owner)?;
+                    }
+                    if self.children.len() > 0 {
+                        write!(fo, "- :")?;
+                        for cld in &self.children {
+                            write!(fo, " {}", cld.borrow().name)?;
+                        }
+                        writeln!(fo)?;
+                    }
+                    for comt in &self.comment {
+                        writeln!(fo, "- % {}", comt)?;
+                    }
+                    for ln in &self.auxilaries {
+                        writeln!(fo, "{}", ln)?;
+                    }
+                }
+            }
             Format::Json => {
                 space = " ".repeat(connectors.len() * 4);
                 writeln!(fo, "{}{{", space)?;
@@ -244,12 +288,16 @@ impl Todo {
             }
         }
         for (pos, child) in self.children.iter().enumerate() {
-            connectors.push(pos + 1 == self.children.len());
-            if pos > 0 && *format == Format::Json {
-                writeln!(fo, "{}    ,", space)?;
+            if visited.insert(child.borrow().name.clone()) {
+                connectors.push(pos + 1 == self.children.len());
+                if pos > 0 && *format == Format::Json {
+                    writeln!(fo, "{}    ,", space)?;
+                }
+                child
+                    .borrow()
+                    .fmt_tree(fo, connectors, visited, maxlens, format)?;
+                connectors.pop();
             }
-            child.borrow().fmt_tree(fo, connectors, maxlens, format)?;
-            connectors.pop();
         }
         if *format == Format::Json {
             writeln!(fo, "{}  ]", space)?;

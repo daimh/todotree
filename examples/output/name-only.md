@@ -7,7 +7,7 @@
 
 Meat, meat, meat, please
 
-# ~~garden~~
+# ~garden
 
 Remember to explore the option of planting cucumber
 
@@ -16,6 +16,6 @@ Remember to explore the option of planting cucumber
 
 We cannot do it too early because the grass is too wet in morning
 
-# ~~mower~~
+# ~mower
 
 Likely, the mower is running out of gas.

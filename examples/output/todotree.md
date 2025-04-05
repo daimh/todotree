@@ -11,7 +11,7 @@
 
 Meat, meat, meat, please
 
-# ~~garden~~
+# ~garden
 - @ Dad
 - % before 6pm, fertilize the tomato bed, then plant it
 
@@ -24,7 +24,7 @@ Remember to explore the option of planting cucumber
 
 We cannot do it too early because the grass is too wet in morning
 
-# ~~mower~~
+# ~mower
 - @ Brody
 - % before noon, test the mower. Don't do it too early, as it might wake up neighbors
 

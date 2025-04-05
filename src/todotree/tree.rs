@@ -12,15 +12,18 @@ pub struct Tree {
     maxlens: [usize; 3],
     dict: HashMap<String, Rc<RefCell<Todo>>>,
     separator: String,
+    auxilaries: Vec<String>,
 }
 
 impl fmt::Display for Tree {
     fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_header(fo)?;
         let mut connectors: Vec<bool> = Vec::new();
+        let mut visited: HashSet<String> = HashSet::new();
         self.root.borrow().fmt_tree(
             fo,
             &mut connectors,
+            &mut visited,
             &self.maxlens,
             &self.format,
         )?;
@@ -42,6 +45,7 @@ impl Tree {
             "html" => Format::Html,
             "json" => Format::Json,
             "term" => Format::Term,
+            "md" => Format::Md,
             "" => Format::Term,
             _ => {
                 return Err(TodoError {
@@ -71,13 +75,15 @@ impl Tree {
                 String::new(),
                 Vec::new(),
                 targets.to_vec(),
+                Vec::new(),
             )?)),
-            format: format_enum,
+            format: format_enum.clone(),
             maxlens: [0; 3],
             dict: HashMap::new(),
             separator: String::from(separator),
+            auxilaries: Vec::new(),
         };
-        let list = tree.readmd(mdfile)?;
+        let todolist = tree.readmd(mdfile)?;
         if tree.root.borrow().dependencies.len() == 0 {
             let mut noparent: HashSet<&String> =
                 HashSet::from_iter(tree.dict.keys());
@@ -94,7 +100,7 @@ impl Tree {
                     });
                 }
             }
-            for nm in list {
+            for nm in todolist {
                 if noparent.contains(&nm) {
                     tree.root.borrow_mut().dependencies.push(nm.clone());
                 }
@@ -104,14 +110,15 @@ impl Tree {
         let mut path: HashSet<String> = HashSet::new();
         let mut visited: HashSet<String> = HashSet::new();
         tree.root.borrow_mut().build_tree(
+            &mut visited,
             &tree.dict,
             &mut tree.maxlens,
             &mut path,
-            &mut visited,
             0,
             screen_width,
             hide,
             dpth_limit,
+            &format_enum,
         )?;
         Ok(tree)
     }
@@ -121,6 +128,7 @@ impl Tree {
         let mut owner = String::new();
         let mut comment: Vec<String> = Vec::new();
         let mut dependencies: Vec<String> = Vec::new();
+        let mut auxilaries: Vec<String> = Vec::new();
         let buffer = match read_to_string(mdfile) {
             Ok(md) => md,
             Err(e) => {
@@ -129,15 +137,17 @@ impl Tree {
                 });
             }
         };
-        let mut list: Vec<String> = Vec::new();
-        for ln in buffer.lines() {
+        let mut todolist: Vec<String> = Vec::new();
+        for mut ln in buffer.lines() {
+            ln = ln.trim();
             if ln.starts_with("# ") {
                 self.new_todo_if_any(
                     name,
                     owner,
                     comment,
                     dependencies,
-                    &mut list,
+                    auxilaries,
+                    &mut todolist,
                 )?;
                 name = match ln.get(2..) {
                     Some(x) => x.trim().to_string(),
@@ -158,6 +168,7 @@ impl Tree {
                 owner = String::new();
                 comment = Vec::new();
                 dependencies = Vec::new();
+                auxilaries = Vec::new();
             } else if ln.starts_with("- @") {
                 if owner.len() > 0 {
                     owner.push_str(" ");
@@ -175,16 +186,25 @@ impl Tree {
                         .map(str::to_string)
                         .collect::<Vec<String>>(),
                 );
+            } else {
+                auxilaries.push(String::from(ln));
             }
         }
-        self.new_todo_if_any(name, owner, comment, dependencies, &mut list)?;
+        self.new_todo_if_any(
+            name,
+            owner,
+            comment,
+            dependencies,
+            auxilaries,
+            &mut todolist,
+        )?;
         match self.dict.len() {
             0 => Err(TodoError {
                 msg: String::from(
                     "ERR-010: The markdown file doesn't have any Todo.",
                 ),
             }),
-            _ => Ok(list),
+            _ => Ok(todolist),
         }
     }
 
@@ -195,23 +215,23 @@ impl Tree {
             HashMap::new();
         for (key, todo) in &self.dict {
             for dep_raw in &todo.borrow().dependencies {
-                let dep_nm = String::from(dep_raw.replace("~", "").trim());
-                noparent.remove(&dep_nm);
+                let dep_nom = String::from(dep_raw.replace("~", "").trim());
+                noparent.remove(&dep_nom);
                 let cur_completed = dep_raw.contains("~");
-                if self.dict.contains_key(&dep_nm) {
+                if self.dict.contains_key(&dep_nom) {
                     if cur_completed {
                         return Err(TodoError {
                             msg: format!(
                                 "ERR-011: Todo '{}' has its own '# ' line, \
 									then it should not have '~' in '{}'s \
 									dependencies list.",
-                                dep_nm, key
+                                dep_nom, key
                             ),
                         });
                     }
                     continue;
                 }
-                match todoindepsonly.get(&dep_nm) {
+                match todoindepsonly.get(&dep_nom) {
                     Some(parent_todo) => {
                         let prv_completed =
                             parent_todo.1.status == Status::Completed;
@@ -221,19 +241,20 @@ impl Tree {
                                     "ERR-012: Todo '{}' has a dependency \
 									'~{}', but todo '{}' has a dependency \
 									'{}'.",
-                                    key, dep_nm, parent_todo.0, dep_nm
+                                    key, dep_nom, parent_todo.0, dep_nom
                                 ),
                             });
                         }
                     }
                     None => {
                         todoindepsonly.insert(
-                            dep_nm.clone(),
+                            dep_nom.clone(),
                             (
                                 String::from(key),
                                 Todo::new(
                                     dep_raw.clone(),
                                     String::new(),
+                                    Vec::new(),
                                     Vec::new(),
                                     Vec::new(),
                                 )?,
@@ -255,9 +276,11 @@ impl Tree {
         owner: String,
         comment: Vec<String>,
         dependencies: Vec<String>,
-        list: &mut Vec<String>,
+        auxilaries: Vec<String>,
+        todolist: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         if name == "" {
+            self.auxilaries = auxilaries;
             if owner == "" && comment.len() == 0 && dependencies.len() == 0 {
                 return Ok(());
             } else {
@@ -275,9 +298,9 @@ impl Tree {
                 vec![comment.join(self.separator.as_str()); 1]
             }
         };
-        let todo = Todo::new(name, owner, comt, dependencies)?;
+        let todo = Todo::new(name, owner, comt, dependencies, auxilaries)?;
         let nm = todo.name.clone();
-        list.push(nm.clone());
+        todolist.push(nm.clone());
         if self
             .dict
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))
@@ -293,6 +316,11 @@ impl Tree {
     fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.format {
             Format::Json => (),
+            Format::Md => {
+                for ln in &self.auxilaries {
+                    writeln!(fo, "{}", ln)?;
+                }
+            }
             _ => {
                 let space = match self.format {
                     Format::Html => String::from("&nbsp;"),
