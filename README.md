@@ -6,9 +6,9 @@ TodoTree visualizes your tasks in a hierarchical structure, showing the complex 
 - **Actionable Todos**: Tasks that are actionable are highlighted in **red**, making them easy to spot.
 - **Pending Todos**: Tasks that are not actionable yet.
 - **Completed Todos**: Completed tasks are marked in **blue**, if they are taged with \~ in the input markdown file.
-- **Multiple Output Formats**: Supports output in terminal, HTML, and JSON formats.
+- **Multiple Output Formats**: Supports output in terminal, html, json and markdown formats.
 
-TodoTree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as completed (using `~` or enclosed in `~~`).
+TodoTree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as **Completed** (using `~` or enclosed in `~~`).
 
 ## Example 
 #### Input 
@@ -77,6 +77,7 @@ while clear; todotree; sleep 2; done
 ```
 todotree -o html -i no-comment.md > no-comment.html
 todotree -o json -i no-owner.md > no-owner.json
+todotree -o md -i no-owner.md > no-owner-new.md
 ```
 
 - run the executable md file
@@ -99,7 +100,7 @@ RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 
 Each to-do item in the input markdown file is defined by four special lines:
 
-1. **`# <todo-name>`**: The task name, consisting of alphabets, digits, and some special characters. Completed tasks will be displayed in **blue** in both the output HTML file and terminal. To mark a task as completed, prefix it with `~` or enclose it in `~~`, which will also apply a strikethrough style in the markdown file.
+1. **`## <todo-name>`**: The task name, consisting of alphabets, digits, and some special characters. Completed tasks will be displayed in **blue** in both the output HTML file and terminal. To mark a task as completed, prefix it with `~` or enclose it in `~~`, which will also apply a strikethrough style in the markdown file.
    
 2. **`- @<owner>`**: The optional owner of the to-do. This field allows you to assign responsibility to a specific person or team.
    

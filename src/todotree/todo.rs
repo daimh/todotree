@@ -10,6 +10,7 @@ pub struct Todo {
     owner: String,
     comment: Vec<String>,
     pub dependencies: Vec<String>,
+    auxilaries: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
     height: i32,
     pub status: Status,
@@ -20,6 +21,7 @@ impl Todo {
         name: String,
         owner: String,
         comment: Vec<String>,
+        auxilaries: Vec<String>,
         dependencies: Vec<String>,
     ) -> Result<Self, TodoError> {
         let status = match name.starts_with("~") {
@@ -30,9 +32,9 @@ impl Todo {
             Status::Completed => String::from(name.replace("~", "").trim()),
             _ => name.clone(),
         };
-        static SPECIALS: [char; 17] = [
+        static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
-            '\'', '"', '.', '?',
+            '\'', '"', '.', '?', '/',
         ];
         if realname != ROOT {
             for c in realname.chars() {
@@ -57,6 +59,7 @@ impl Todo {
             comment: comment,
             status: status,
             dependencies: dependencies,
+            auxilaries: auxilaries,
             children: Vec::new(),
             height: 0,
         })
@@ -72,6 +75,7 @@ impl Todo {
         screen_width: usize,
         hide: bool,
         dpth_limit: i32,
+        format: &Format,
     ) -> Result<(), TodoError> {
         let mut notdonedeps: Vec<String> = vec![];
         for dep_raw in &self.dependencies {
@@ -86,7 +90,14 @@ impl Todo {
             }
             let child = match map.get(&dep_nm) {
                 Some(x) => x,
-                _ => panic!("ERR-003: {} is missing", &dep_nm),
+                _ => {
+                    return Err(TodoError {
+                        msg: format!(
+                            "ERR-003: Todo {} is missing in the markdown file",
+                            &dep_nm
+                        ),
+                    });
+                }
             };
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
@@ -104,6 +115,7 @@ impl Todo {
                     screen_width,
                     hide,
                     dpth_limit,
+                    format,
                 )?;
                 let child_height = child.borrow().height;
                 self.height = max(child_height + 1, self.height);
@@ -189,6 +201,32 @@ impl Todo {
     ) -> fmt::Result {
         let space: String;
         match format {
+            Format::Md => {
+                space = String::from("Panic");
+                if self.name != "/" {
+                    write!(fo, "# ")?;
+                    if self.status == Status::Completed {
+                        write!(fo, "~")?;
+                    }
+                    writeln!(fo, "{}", self.name)?;
+                    if self.owner != "" {
+                        writeln!(fo, "- @ {}", self.owner)?;
+                    }
+                    if self.children.len() > 0 {
+                        write!(fo, "- :")?;
+                        for cld in &self.children {
+                            write!(fo, " {}", cld.borrow().name)?;
+                        }
+                        writeln!(fo)?;
+                    }
+                    for comt in &self.comment {
+                        writeln!(fo, "- % {}", comt)?;
+                    }
+                    for ln in &self.auxilaries {
+                        writeln!(fo, "{}", ln)?;
+                    }
+                }
+            }
             Format::Json => {
                 space = " ".repeat(connectors.len() * 4);
                 writeln!(fo, "{}{{", space)?;

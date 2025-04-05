@@ -16,7 +16,7 @@ fn examples() {
                 2 => (false, 2, "examples/depth/pos2/"),
                 _ => (false, -1, "examples/depth/neg1/"),
             };
-            for format in vec!["term", "json", "html"] {
+            for format in vec!["term", "json", "html", "md"] {
                 let result = Tree::new(
                     &md,
                     &mut Vec::<String>::new(),

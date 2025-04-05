@@ -2,21 +2,18 @@
 
 # movie
 - @ family
-- : dinner garden lawn
+- : dinner garden lawn/
 
 # dinner
 - @ Mom
 
 Meat, meat, meat, please
 
-# ~~garden~~
+# ~garden
 - @ Dad
 
 Remember to explore the option of planting cucumber
 
-# lawn
+# lawn/
 - @ Avery
-- : mower
 
-# ~~mower~~
-- @ Brody

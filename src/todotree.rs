@@ -6,11 +6,12 @@ static ROOT: &str = "/";
 static HTMLP: &str = "<p style='font-family: monospace; font-size: 16px; \
 	margin: 0px; line-height: 16px'>";
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum Format {
     Html,
     Json,
     Term,
+    Md,
 }
 
 #[derive(PartialEq, Debug)]
