@@ -1,5 +1,5 @@
 # movie
-- : dinner garden lawn/
+- : dinner garden lawn
 - % minimalist style
 
 # dinner
@@ -7,4 +7,5 @@
 # ~garden
 
 # lawn/
+- : mower
 

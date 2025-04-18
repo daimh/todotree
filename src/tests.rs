@@ -33,18 +33,18 @@ fn examples() {
                 let mut output = String::new();
                 match write!(output, "{}", tree) {
                     Ok(s) => s,
-                    Err(e) => panic!("ERR-902: Failed to write '{}'.", e),
+                    Err(e) => panic!("ERR-902: Failed to write '{}'", e),
                 }
                 let basefile = md[0..md.len() - 3].replace("examples/", outdir)
                     + "."
                     + format;
                 let standard = match read_to_string(&basefile) {
                     Ok(s) => s,
-                    Err(e) => panic!("ERR-903: '{}', {}.", basefile, e),
+                    Err(e) => panic!("ERR-903: '{}', {}", basefile, e),
                 };
                 assert!(
                     standard == output,
-                    "ERR-904: md: {}, format: {}, hide: {}, depth: {}.",
+                    "ERR-904: md: {}, format: {}, hide: {}, depth: {}",
                     &md,
                     format,
                     hide,

@@ -2,7 +2,7 @@
 
 # movie
 - @ family
-- : dinner lawn
+- : dinner garden lawn
 
 # dinner
 - @ Mom
@@ -11,4 +11,5 @@ Meat, meat, meat, please
 
 # lawn
 - @ Avery
+- : mower
 

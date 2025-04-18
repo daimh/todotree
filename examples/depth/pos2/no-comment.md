@@ -2,7 +2,7 @@
 
 # movie
 - @ family
-- : dinner garden lawn/
+- : dinner garden lawn
 
 # dinner
 - @ Mom
@@ -16,4 +16,5 @@ Remember to explore the option of planting cucumber
 
 # lawn/
 - @ Avery
+- : mower
 

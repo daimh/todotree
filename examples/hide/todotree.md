@@ -2,7 +2,7 @@
 
 # movie
 - @ family
-- : dinner lawn
+- : dinner garden lawn
 - % at 7pm, arrive at the movie theater
 
 # dinner
@@ -13,6 +13,7 @@ Meat, meat, meat, please
 
 # lawn
 - @ Avery
+- : mower
 - % at noon, mow the lawn
 
 We cannot do it too early because the grass is too wet in morning

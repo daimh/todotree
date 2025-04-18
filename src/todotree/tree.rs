@@ -1,7 +1,7 @@
 use super::{Format, HTMLP, ROOT, Status, TodoError, todo::Todo};
 use libc::{STDOUT_FILENO, TIOCGWINSZ, ioctl, winsize};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
@@ -19,7 +19,7 @@ impl fmt::Display for Tree {
     fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_header(fo)?;
         let mut connectors: Vec<bool> = Vec::new();
-        let mut visited: HashSet<String> = HashSet::new();
+        let mut visited: BTreeSet<String> = BTreeSet::new();
         self.root.borrow().fmt_tree(
             fo,
             &mut connectors,
@@ -85,17 +85,17 @@ impl Tree {
         };
         let todolist = tree.readmd(mdfile)?;
         if tree.root.borrow().dependencies.len() == 0 {
-            let mut noparent: HashSet<&String> =
-                HashSet::from_iter(tree.dict.keys());
+            let mut noparent: BTreeSet<&String> =
+                BTreeSet::from_iter(tree.dict.keys());
             for todo in tree.dict.values() {
-                for dep_raw in &todo.borrow().dependencies {
-                    let dep_nm = String::from(dep_raw.replace("~", "").trim());
-                    noparent.remove(&dep_nm);
+                for dep in &todo.borrow().dependencies {
+                    let dep = dep.replace("~", "");
+                    noparent.remove(&dep);
                 }
                 if noparent.len() == 0 {
                     return Err(TodoError {
                         msg: String::from(
-                            "ERR-007: All todos are in a dependency loop.",
+                            "ERR-007: All todos are in dependency loops",
                         ),
                     });
                 }
@@ -107,8 +107,8 @@ impl Tree {
             }
         }
         tree.get_todos_in_dep_only()?;
-        let mut path: HashSet<String> = HashSet::new();
-        let mut visited: HashSet<String> = HashSet::new();
+        let mut path: BTreeSet<String> = BTreeSet::new();
+        let mut visited: BTreeSet<String> = BTreeSet::new();
         tree.root.borrow_mut().build_tree(
             &mut visited,
             &tree.dict,
@@ -138,8 +138,8 @@ impl Tree {
             }
         };
         let mut todolist: Vec<String> = Vec::new();
-        for mut ln in buffer.lines() {
-            ln = ln.trim();
+        for ln in buffer.lines() {
+            let ln = &ln.trim().replace("\t", " ");
             if ln.starts_with("# ") {
                 self.new_todo_if_any(
                     name,
@@ -153,14 +153,14 @@ impl Tree {
                     Some(x) => x.trim().to_string(),
                     _ => {
                         return Err(TodoError {
-                            msg: format!("ERR-015: '{}'.", ln),
+                            msg: format!("ERR-015: '{}'", ln),
                         });
                     }
                 };
                 if name == "" || name == ROOT {
                     return Err(TodoError {
                         msg: format!(
-                            "ERR-009: '{}' is a reserved Todo name keyword.",
+                            "ERR-009: '{}' is a reserved Todo name keyword",
                             ROOT
                         ),
                     });
@@ -186,6 +186,17 @@ impl Tree {
                         .map(str::to_string)
                         .collect::<Vec<String>>(),
                 );
+                for dep in dependencies.iter() {
+                    let dep = dep.replace("~", "");
+                    if dep == name {
+                        return Err(TodoError {
+                            msg: format!(
+                                "ERR-016: Todo '{}' should not depend on itself",
+                                dep
+                            ),
+                        });
+                    }
+                }
             } else {
                 auxilaries.push(String::from(ln));
             }
@@ -201,7 +212,7 @@ impl Tree {
         match self.dict.len() {
             0 => Err(TodoError {
                 msg: String::from(
-                    "ERR-010: The markdown file doesn't have any Todo.",
+                    "ERR-010: The markdown file does not have any Todo",
                 ),
             }),
             _ => Ok(todolist),
@@ -209,8 +220,8 @@ impl Tree {
     }
 
     fn get_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
-        let mut noparent: HashSet<&String> =
-            HashSet::from_iter(self.dict.keys());
+        let mut noparent: BTreeSet<&String> =
+            BTreeSet::from_iter(self.dict.keys());
         let mut todoindepsonly: HashMap<String, (String, Todo)> =
             HashMap::new();
         for (key, todo) in &self.dict {
@@ -307,7 +318,7 @@ impl Tree {
             .is_some()
         {
             return Err(TodoError {
-                msg: format!("ERR-014: Duplicated todo name '{}'.", nm),
+                msg: format!("ERR-014: Duplicated todo name '{}'", nm),
             });
         }
         Ok(())

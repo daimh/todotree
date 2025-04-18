@@ -1,7 +1,7 @@
 use super::{Format, HTMLP, ROOT, Status, TodoError};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::rc::Rc;
 
@@ -18,26 +18,33 @@ pub struct Todo {
 
 impl Todo {
     pub fn new(
-        name: String,
+        mut name: String,
         owner: String,
         comment: Vec<String>,
         dependencies: Vec<String>,
         auxilaries: Vec<String>,
     ) -> Result<Self, TodoError> {
         let status = match name.starts_with("~") {
-            true => Status::Completed,
+            true => {
+                name = name.replace("~", "");
+                Status::Completed
+            }
             false => Status::Pending,
-        };
-        let realname = match status {
-            Status::Completed => String::from(name.replace("~", "").trim()),
-            _ => name.clone(),
         };
         static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
             '\'', '"', '.', '?', '/',
         ];
-        if realname != ROOT {
-            for c in realname.chars() {
+        if name != ROOT {
+            if name.ends_with(ROOT) {
+                return Err(TodoError {
+                    msg: format!(
+                        "ERR-018: Todo name '{}' should not end with '/'",
+                        name
+                    ),
+                });
+            }
+            for c in name.chars() {
                 if !SPECIALS.contains(&c)
                     && (c < 'a' || c > 'z')
                     && (c < 'A' || c > 'Z')
@@ -45,8 +52,9 @@ impl Todo {
                 {
                     return Err(TodoError {
                         msg: format!(
-                            "ERR-001: Todo name '{}' contains some character \
-						'{}', which is not alphabet, digit, or {:?}.",
+                            "ERR-001: Todo name '{}' contains unsupported \
+                            'character {}', which is not alphabet, digit, \
+							or {:?}",
                             name, c, SPECIALS
                         ),
                     });
@@ -58,7 +66,7 @@ impl Todo {
             _ => auxilaries,
         };
         Ok(Todo {
-            name: realname,
+            name: name,
             owner: owner,
             comment: comment,
             status: status,
@@ -71,10 +79,10 @@ impl Todo {
 
     pub fn build_tree(
         &mut self,
-        visited: &mut HashSet<String>,
+        visited: &mut BTreeSet<String>,
         map: &HashMap<String, Rc<RefCell<Todo>>>,
         maxlens: &mut [usize; 3],
-        path: &mut HashSet<String>,
+        path: &mut BTreeSet<String>,
         depth: usize,
         screen_width: usize,
         hide: bool,
@@ -82,30 +90,22 @@ impl Todo {
         format: &Format,
     ) -> Result<(), TodoError> {
         let mut notdonedeps: Vec<String> = vec![];
-        for dep_raw in &self.dependencies {
-            let dep_nm = String::from(dep_raw.replace("~", "").trim());
-            if !path.insert(dep_nm.clone()) {
+        for dep in &self.dependencies {
+            let dep = dep.replace("~", "");
+            if !path.insert(dep.clone()) {
                 return Err(TodoError {
                     msg: format!(
-                        "ERR-002: Todo '{}' has a dependency loop.",
-                        self.name
+                        "ERR-002: Todos '{:?}' has a dependency loop",
+                        path
                     ),
                 });
             }
-            let child = match map.get(&dep_nm) {
-                Some(x) => x,
-                _ => {
-                    return Err(TodoError {
-                        msg: format!(
-                            "ERR-003: Todo {} is missing in the markdown file",
-                            &dep_nm
-                        ),
-                    });
-                }
-            };
+            let child = map.get(&dep).unwrap_or_else(|| {
+                panic!("ERR-003: Todo {} is missing in the markdown file", &dep)
+            });
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
-                notdonedeps.push(dep_nm.clone());
+                notdonedeps.push(dep.clone());
             }
             if dpth_limit <= 0 || dpth_limit > depth as i32 {
                 if visited.insert(child.borrow().name.clone()) {
@@ -120,16 +120,16 @@ impl Todo {
                         dpth_limit,
                         format,
                     )?;
-                }
-                let child_height = child.borrow().height;
-                self.height = max(child_height + 1, self.height);
-                if (dpth_limit >= 0 || child_height + dpth_limit >= 0)
-                    && (dep_notdone || !hide)
-                {
-                    self.children.push(Rc::clone(child));
+                    let child_height = child.borrow().height;
+                    self.height = max(child_height + 1, self.height);
+                    if (dpth_limit >= 0 || child_height + dpth_limit >= 0)
+                        && (dep_notdone || !hide)
+                    {
+                        self.children.push(Rc::clone(child));
+                    }
                 }
             }
-            path.remove(&dep_nm);
+            path.remove(&dep);
         }
         if notdonedeps.len() == 0 {
             if self.status != Status::Completed {
@@ -138,8 +138,8 @@ impl Todo {
         } else if self.status == Status::Completed {
             return Err(TodoError {
                 msg: format!(
-                    "ERR-004: Todo \"{}\" cannot be marked as completed \
-				because its dependencies {:?} are yet completed.",
+                    "ERR-004: Todo \"{}\" cannot be completed \
+                    because its dependencies {:?} are not completed yet",
                     self.name, notdonedeps
                 ),
             });
@@ -185,7 +185,7 @@ impl Todo {
                 return Err(TodoError {
                     msg: format!(
                         "ERR-005: Screen width is {}, but this todotree \
-						needs at least {} columns",
+                        needs at least {} columns",
                         screen_width,
                         maxlens[0] + maxlens[1] + 8
                     ),
@@ -201,7 +201,7 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
-        visited: &mut HashSet<String>,
+        visited: &mut BTreeSet<String>,
         maxlens: &[usize; 3],
         format: &Format,
     ) -> fmt::Result {
@@ -218,12 +218,13 @@ impl Todo {
                     if self.owner != "" {
                         writeln!(fo, "- @ {}", self.owner)?;
                     }
-                    if self.children.len() > 0 {
-                        write!(fo, "- :")?;
-                        for cld in &self.children {
-                            write!(fo, " {}", cld.borrow().name)?;
-                        }
-                        writeln!(fo)?;
+                    if self.dependencies.len() > 0 {
+                        let normalized = self
+                            .dependencies
+                            .iter()
+                            .map(|x| x.replace("~", ""))
+                            .collect::<Vec<String>>();
+                        writeln!(fo, "- : {}", normalized.join(" "))?;
                     }
                     for comt in &self.comment {
                         writeln!(fo, "- % {}", comt)?;
