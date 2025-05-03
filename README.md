@@ -1,6 +1,6 @@
-# TodoTree: Display Todos with a Dependency Tree
+# Todotree: Visualize Tasks with a Dependency Tree
 
-TodoTree visualizes your tasks in a hierarchical structure, showing the complex relationships between them. Unlike typical to-do apps that display tasks as a flat list, TodoTree organizes your todos into a tree, inspired by the structure of a Makefile.
+Todotree visualize tasks as a dependency tree rather than a flat list, highlighting complex relationships and color-coding their statuses. Inspired by the structure of Makefiles and the readability of Markdown.
 
 - **Dependency Tree**: Todos are displayed in a tree format, showing dependencies between tasks.
 - **Actionable Todos**: Tasks that are actionable are highlighted in **red**, making them easy to spot.
@@ -8,7 +8,7 @@ TodoTree visualizes your tasks in a hierarchical structure, showing the complex 
 - **Completed Todos**: Completed tasks are marked in **blue**, if they are taged with \~ in the input markdown file.
 - **Multiple Output Formats**: Supports output in terminal, html, json and markdown formats.
 
-TodoTree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as **Completed** (using `~` or enclosed in `~~`).
+Todotree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as **Completed** (using `~` or enclosed in `~~`).
 
 ## Example 
 #### Input 

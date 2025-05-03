@@ -28,7 +28,7 @@ fn main() -> ExitCode {
     opts.optopt(
         "s",
         "separator",
-        "use STRING instead of \"\\n\" as separator when  merging multiple lines",
+        "use STRING instead of \"\\n\" to join multiple lines of comments",
         "STRING",
     );
     opts.optflag("n", "hide", "hide todos that are completed");
@@ -111,9 +111,9 @@ fn print_usage(opts: &Options) {
         "{}",
         opts.usage(
             "Usage: todotree [options] [TODO]...\n\
-            Display todos with a dependency tree. Highlight ongoing ones \n\
-            with red, or finished ones with strikethrough. Support \n\
-            terminal, html and json output format."
+			Visualize tasks as a dependency tree rather than a flat list, highlighting complex relationships and color-coding their statuses. Inspired by the structure of Makefiles and the readability of Markdown.
+            \n\
+            Repo: https://github.com/daimh/todotree"
         )
     );
 }

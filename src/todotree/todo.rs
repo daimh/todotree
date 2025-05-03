@@ -10,9 +10,11 @@ pub struct Todo {
     owner: String,
     comment: Vec<String>,
     pub dependencies: Vec<String>,
+    /// the markdown file lines following each todo
     auxilaries: Vec<String>,
     children: Vec<Rc<RefCell<Todo>>>,
-    height: i32,
+    /// the depth based on its deepest child
+    depth: i32,
     pub status: Status,
 }
 
@@ -73,7 +75,7 @@ impl Todo {
             dependencies: dependencies,
             auxilaries: realauxl,
             children: Vec::new(),
-            height: 0,
+            depth: 0,
         })
     }
 
@@ -120,9 +122,9 @@ impl Todo {
                         dpth_limit,
                         format,
                     )?;
-                    let child_height = child.borrow().height;
-                    self.height = max(child_height + 1, self.height);
-                    if (dpth_limit >= 0 || child_height + dpth_limit >= 0)
+                    let child_depth = child.borrow().depth;
+                    self.depth = max(child_depth + 1, self.depth);
+                    if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
                         && (dep_notdone || !hide)
                     {
                         self.children.push(Rc::clone(child));
@@ -149,7 +151,7 @@ impl Todo {
         } else if self.dependencies.len() > 0
             && !self.name.ends_with(ROOT)
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
-                || (dpth_limit < 0 && self.height + dpth_limit == 0))
+                || (dpth_limit < 0 && self.depth + dpth_limit == 0))
         {
             self.name.push_str(ROOT)
         }

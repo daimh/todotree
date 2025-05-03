@@ -6,12 +6,19 @@ use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
 
+/// A tree of todos
 pub struct Tree {
+    /// tree root
     root: Rc<RefCell<Todo>>,
+    /// output format
     format: Format,
+    /// maximum length of the three columns
     maxlens: [usize; 3],
+    /// a map of todos, key is map name
     dict: HashMap<String, Rc<RefCell<Todo>>>,
+    /// a separator joining multiple lines of comments
     separator: String,
+    /// auxilary lines before the first todo
     auxilaries: Vec<String>,
 }
 
@@ -32,6 +39,7 @@ impl fmt::Display for Tree {
 }
 
 impl Tree {
+    /// Creates a tree from a markdown file.
     pub fn new(
         mdfile: &str,
         targets: &[String],
@@ -123,6 +131,7 @@ impl Tree {
         Ok(tree)
     }
 
+    /// Creates a list of todos from a markdown fie.
     fn readmd(&mut self, mdfile: &str) -> Result<Vec<String>, TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
@@ -219,6 +228,7 @@ impl Tree {
         }
     }
 
+    /// Returns the todos that are defined in dependencies only.
     fn get_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
         let mut noparent: BTreeSet<&String> =
             BTreeSet::from_iter(self.dict.keys());
@@ -281,6 +291,9 @@ impl Tree {
         Ok(())
     }
 
+    /// Creates todo
+    ///
+    /// When readmd reads the second todo or reaches the markdown file end.
     fn new_todo_if_any(
         &mut self,
         name: String,
@@ -324,6 +337,7 @@ impl Tree {
         Ok(())
     }
 
+    /// Formats the output table header.
     fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.format {
             Format::Json => (),
