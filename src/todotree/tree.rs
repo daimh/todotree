@@ -131,6 +131,36 @@ impl Tree {
         Ok(tree)
     }
 
+    /// escape markdown string
+    fn escape(&mut self, input: &String) -> String {
+        static SPECIALS: [char; 15] = [
+            '\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-',
+            '.', '!',
+        ];
+        let mut escaped = String::from("");
+        let mut prev_is_slash = false;
+        for mut c in input.chars() {
+            if c == '\t' {
+                c = ' ';
+            }
+            if prev_is_slash {
+                if !SPECIALS.contains(&c) {
+                    escaped.push('\\');
+                }
+                escaped.push(c);
+                prev_is_slash = false;
+            } else if c == '\\' {
+                prev_is_slash = true;
+            } else {
+                escaped.push(c);
+            }
+        }
+        if prev_is_slash {
+            escaped.push('\\');
+        }
+        escaped
+    }
+
     /// Creates a list of todos from a markdown fie.
     fn readmd(&mut self, mdfile: &str) -> Result<Vec<String>, TodoError> {
         let mut name = String::new();
@@ -139,7 +169,7 @@ impl Tree {
         let mut dependencies: Vec<String> = Vec::new();
         let mut auxilaries: Vec<String> = Vec::new();
         let buffer = match read_to_string(mdfile) {
-            Ok(md) => md,
+            Ok(md) => self.escape(&md),
             Err(e) => {
                 return Err(TodoError {
                     msg: format!("ERR-008: '{}', {}.", mdfile, e),
@@ -148,7 +178,7 @@ impl Tree {
         };
         let mut todolist: Vec<String> = Vec::new();
         for ln in buffer.lines() {
-            let ln = &ln.trim().replace("\t", " ");
+            let ln = ln.trim();
             if ln.starts_with("# ") {
                 self.new_todo_if_any(
                     name,
