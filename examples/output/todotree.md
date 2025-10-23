@@ -13,7 +13,9 @@ Meat, meat, meat, please
 
 # ~garden
 - @ Dad
-- % before 6pm, fertilize the tomato bed, then plant it
+- % get out at 5pm
+- % fertilize tomato bed
+- % plant it
 
 Remember to explore the option of planting cucumber
 

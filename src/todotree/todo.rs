@@ -55,7 +55,7 @@ impl Todo {
                     return Err(TodoError {
                         msg: format!(
                             "ERR-001: Todo name '{}' contains unsupported \
-                            'character {}', which is not alphabet, digit, \
+                            character '{}', which is not alphabet, digit, \
 							or {:?}",
                             name, c, SPECIALS
                         ),
@@ -452,6 +452,12 @@ impl Todo {
             0 => &vec![String::new(); 1],
             _ => &self.comment,
         };
+		let dgt_width = comt.len().to_string().len();
+		let seq_width = match self.comment.len() {
+			0 | 1 => 0,
+			_ => dgt_width + 2,
+		};
+		let cmt_width = maxlens[2] - seq_width;
         for (idx, line) in comt.iter().enumerate() {
             if idx > 0 {
                 self.fmt_cont_comment_or_dash(
@@ -460,9 +466,15 @@ impl Todo {
             }
             let mut start = 0;
             loop {
-                let slen = min(line.len() - start, maxlens[2]);
+                let slen = min(line.len() - start, cmt_width);
+				if seq_width > 0 {
+					match start {
+						0 => write!(fo, "{:0>dgt_width$}.{}", idx+1, space),
+						_ => write!(fo, "{}", space.repeat(seq_width)),
+					}?;
+				}
                 write!(fo, "{}", &line[start..start + slen])?;
-                write!(fo, "{}", space.repeat(maxlens[2] - slen))?;
+                write!(fo, "{}", space.repeat(cmt_width - slen))?;
                 write!(fo, "{}│{}", space, eol)?;
                 start = start + slen;
                 if start >= line.len() {

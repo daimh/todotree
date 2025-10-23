@@ -23,7 +23,7 @@
           "name": "garden",
           "status": "Completed",
           "owner": "Dad",
-          "comment": "before 6pm, fertilize the tomato bed, then plant it",
+          "comment": "get out at 5pm",
           "dependencies": [
           ]
         }
