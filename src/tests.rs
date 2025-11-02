@@ -25,6 +25,7 @@ fn examples() {
                     hide,
                     depth,
                     "\n",
+                    true,
                 );
                 let tree = match result {
                     Ok(t) => t,
@@ -66,7 +67,7 @@ fn errors() {
             20 => Vec::<String>::new(),
             _ => vec![md[18..].replace(".md", ""); 1],
         };
-        match Tree::new(&md, &target, 0, "term", false, 0, " ") {
+        match Tree::new(&md, &target, 0, "term", false, 0, " ", true) {
             Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
             _ => panic!("ERR-905"),
         }

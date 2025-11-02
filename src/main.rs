@@ -1,7 +1,11 @@
 use getopts::Options;
 use std::env;
+use std::io::ErrorKind;
 use std::process::ExitCode;
+use std::thread;
+use std::time::Duration;
 mod todotree;
+use inotify::{Inotify, WatchMask};
 use todotree::tree::Tree;
 
 fn main() -> ExitCode {
@@ -10,30 +14,36 @@ fn main() -> ExitCode {
     opts.optopt(
         "i",
         "input",
-        "use MARKDOWN file instead of 'todotree.md' as input",
+        "Use MARKDOWN file as input (default:  'todotree.md')",
         "MARKDOWN",
     );
     opts.optopt(
         "o",
         "format",
-        "set output FORMAT to 'html', 'json', or 'term' (by default)",
+        "Set output format to 'html', 'json', 'md', or 'term' (default: 'term')",
         "FORMAT",
     );
     opts.optopt(
         "d",
         "depth",
-        "max display of the tree. Negative int removes the leaf nodes",
+        "Limit the displayed tree depth. A negative value hides leaf nodes.",
         "DEPTH",
     );
     opts.optopt(
         "s",
         "separator",
-        "use STRING instead of \"\\n\" to join multiple lines of comments",
+        "Use STRING instead of \"\\n\" to join multi-line comments.",
         "STRING",
     );
-    opts.optflag("n", "hide", "hide todos that are completed");
-    opts.optflag("h", "help", "print this help menu");
-    opts.optflag("", "version", "print version");
+    opts.optflag("q", "hide", "Hide completed TODO items.");
+    opts.optflag(
+        "r",
+        "refresh",
+        "Automatically refresh the tree when the input file changes.",
+    );
+    opts.optflag("C", "no-color", "Disable color output.");
+    opts.optflag("h", "help", "Show this help message and exit.");
+    opts.optflag("", "version", "Show version information and exit.");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
@@ -45,19 +55,19 @@ fn main() -> ExitCode {
         print_version();
         return ExitCode::SUCCESS;
     }
-    if matches.opt_present("h") {
+    if matches.opt_present("help") {
         print_usage(&opts);
         return ExitCode::SUCCESS;
     }
-    let input = match matches.opt_str("i") {
+    let input = match matches.opt_str("input") {
         Some(x) => x,
         None => String::from("todotree.md"),
     };
-    let format = match matches.opt_str("o") {
+    let format = match matches.opt_str("format") {
         Some(x) => x,
         None => String::new(),
     };
-    let depth: i32 = match matches.opt_str("d") {
+    let depth: i32 = match matches.opt_str("depth") {
         Some(x) => match x.parse() {
             Ok(n) => n,
             Err(e) => {
@@ -72,26 +82,87 @@ fn main() -> ExitCode {
         true => &vec![],
         false => free,
     };
-    let separator = match matches.opt_str("s") {
+    let separator = match matches.opt_str("separator") {
         Some(x) => x,
         None => String::from("\n"),
     };
-    match Tree::new(
+    if matches.opt_present("refresh") {
+        print!("\x1B[2J\x1B[1;1H");
+    }
+    if !print_tree(
         &input,
         targets,
         0,
         format.as_str(),
-        matches.opt_present("n"),
+        matches.opt_present("hide"),
         depth,
         separator.as_str(),
+        !matches.opt_present("no-color"),
+    ) {
+        return ExitCode::FAILURE;
+    }
+    if matches.opt_present("refresh") {
+        loop {
+            let mut inotify = Inotify::init()
+                .expect("Error while initializing inotify instance");
+            match inotify
+                .watches()
+                .add(&input, WatchMask::MODIFY | WatchMask::CLOSE)
+            {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("{}", e);
+                    match e.kind() {
+                        ErrorKind::NotFound => {
+                            thread::sleep(Duration::from_secs(1));
+                            continue;
+                        }
+                        _ => break,
+                    }
+                }
+            }
+            let mut buffer = [0; 1024];
+            inotify
+                .read_events_blocking(&mut buffer)
+                .expect("Error while reading events");
+            print!("\x1B[2J\x1B[1;1H");
+            if !print_tree(
+                &input,
+                targets,
+                0,
+                format.as_str(),
+                matches.opt_present("hide"),
+                depth,
+                separator.as_str(),
+                !matches.opt_present("no-color"),
+            ) {
+                return ExitCode::FAILURE;
+            }
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+fn print_tree(
+    mdfile: &str,
+    targets: &[String],
+    term_width: usize,
+    format: &str,
+    hide: bool,
+    dpth_limit: i32,
+    separator: &str,
+    color: bool,
+) -> bool {
+    match Tree::new(
+        mdfile, targets, term_width, format, hide, dpth_limit, separator, color,
     ) {
         Ok(tree) => {
             print!("{}", tree);
-            ExitCode::SUCCESS
+            return true;
         }
         Err(e) => {
             eprintln!("{}", e);
-            ExitCode::FAILURE
+            return false;
         }
     }
 }
@@ -110,10 +181,12 @@ fn print_usage(opts: &Options) {
     print!(
         "{}",
         opts.usage(
-            "Usage: todotree [options] [TODO]...\n\
-			Visualize tasks as a dependency tree rather than a flat list, highlighting complex relationships and color-coding their statuses. Inspired by the structure of Makefiles and the readability of Markdown.
-            \n\
-            Repo: https://github.com/daimh/todotree"
+            "\
+Usage: todotree [options] [TODO]...\n\n\
+Visualize tasks as a dependency tree instead of a flat list.\n\
+todotree highlights complex relationships and color-codes task statuses,\n\
+combining the structure of Makefiles with the readability of Markdown.\n\n\
+Repo: https://github.com/daimh/todotree"
         )
     );
 }

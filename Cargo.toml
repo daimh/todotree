@@ -1,6 +1,6 @@
 [package]
 name = "todotree"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 authors = ["Manhong Dai"]
 license = "MIT"
@@ -8,4 +8,5 @@ repository = "https://github.com/daimh/todotree.git"
 
 [dependencies]
 getopts = "0.2.21"
+inotify = "0.11.0"
 libc = "0.2.171"

@@ -20,6 +20,8 @@ pub struct Tree {
     separator: String,
     /// auxilary lines before the first todo
     auxilaries: Vec<String>,
+    /// color
+    color: bool,
 }
 
 impl fmt::Display for Tree {
@@ -33,6 +35,7 @@ impl fmt::Display for Tree {
             &mut visited,
             &self.maxlens,
             &self.format,
+            self.color,
         )?;
         Ok(())
     }
@@ -48,6 +51,7 @@ impl Tree {
         hide: bool,
         dpth_limit: i32,
         separator: &str,
+        color: bool,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -90,6 +94,7 @@ impl Tree {
             dict: HashMap::new(),
             separator: String::from(separator),
             auxilaries: Vec::new(),
+            color: color,
         };
         let todolist = tree.readmd(mdfile)?;
         if tree.root.borrow().dependencies.len() == 0 {

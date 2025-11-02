@@ -182,6 +182,9 @@ impl Todo {
         for line in &self.comment {
             maxlens[2] = max(maxlens[2], line.len());
         }
+        if self.comment.len() > 1 {
+            maxlens[2] += self.comment.len().to_string().len() + 2;
+        }
         if self.name == ROOT {
             if screen_width <= maxlens[0] + maxlens[1] + 8 {
                 return Err(TodoError {
@@ -206,6 +209,7 @@ impl Todo {
         visited: &mut BTreeSet<String>,
         maxlens: &[usize; 3],
         format: &Format,
+        color: bool,
     ) -> fmt::Result {
         let space: String;
         match format {
@@ -257,13 +261,19 @@ impl Todo {
                 space = String::from(" ");
                 let bol = String::new();
                 self.fmt_connector(fo, connectors, &space, &bol)?;
-                match self.status {
-                    Status::Completed => write!(fo, "\x1b\x5b\x33\x34\x6d")?,
-                    Status::Actionable => write!(fo, "\x1b\x5b\x33\x31\x6d")?,
-                    Status::Pending => (),
+                if color {
+                    match self.status {
+                        Status::Completed => {
+                            write!(fo, "\x1b\x5b\x33\x34\x6d")?
+                        }
+                        Status::Actionable => {
+                            write!(fo, "\x1b\x5b\x33\x31\x6d")?
+                        }
+                        Status::Pending => (),
+                    }
                 }
                 write!(fo, "{}", self.name)?;
-                if self.status != Status::Pending {
+                if color && self.status != Status::Pending {
                     write!(fo, "\x1b\x28\x42\x1b\x5b\x6d")?;
                 }
                 let eol = String::from("\n");
@@ -274,17 +284,19 @@ impl Todo {
                 let bol = String::from(HTMLP);
                 let eol = String::from("</p>\n");
                 self.fmt_connector(fo, connectors, &space, &bol)?;
-                match self.status {
-                    Status::Completed => {
-                        write!(fo, "<span style='color:blue'>")?
+                if color {
+                    match self.status {
+                        Status::Completed => {
+                            write!(fo, "<span style='color:blue'>")?
+                        }
+                        Status::Actionable => {
+                            write!(fo, "<span style='color:red'>")?
+                        }
+                        Status::Pending => (),
                     }
-                    Status::Actionable => {
-                        write!(fo, "<span style='color:red'>")?
-                    }
-                    Status::Pending => (),
                 }
                 write!(fo, "{}", self.name)?;
-                if self.status != Status::Pending {
+                if color && self.status != Status::Pending {
                     write!(fo, "</span>")?;
                 }
                 self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
@@ -296,9 +308,9 @@ impl Todo {
                 if pos > 0 && *format == Format::Json {
                     writeln!(fo, "{}    ,", space)?;
                 }
-                child
-                    .borrow()
-                    .fmt_tree(fo, connectors, visited, maxlens, format)?;
+                child.borrow().fmt_tree(
+                    fo, connectors, visited, maxlens, format, color,
+                )?;
                 connectors.pop();
             }
         }
@@ -452,12 +464,12 @@ impl Todo {
             0 => &vec![String::new(); 1],
             _ => &self.comment,
         };
-		let dgt_width = comt.len().to_string().len();
-		let seq_width = match self.comment.len() {
-			0 | 1 => 0,
-			_ => dgt_width + 2,
-		};
-		let cmt_width = maxlens[2] - seq_width;
+        let dgt_width = comt.len().to_string().len();
+        let seq_width = match self.comment.len() {
+            0 | 1 => 0,
+            _ => dgt_width + 2,
+        };
+        let cmt_width = maxlens[2] - seq_width;
         for (idx, line) in comt.iter().enumerate() {
             if idx > 0 {
                 self.fmt_cont_comment_or_dash(
@@ -467,12 +479,12 @@ impl Todo {
             let mut start = 0;
             loop {
                 let slen = min(line.len() - start, cmt_width);
-				if seq_width > 0 {
-					match start {
-						0 => write!(fo, "{:0>dgt_width$}.{}", idx+1, space),
-						_ => write!(fo, "{}", space.repeat(seq_width)),
-					}?;
-				}
+                if seq_width > 0 {
+                    match start {
+                        0 => write!(fo, "{:0>dgt_width$}.{}", idx + 1, space),
+                        _ => write!(fo, "{}", space.repeat(seq_width)),
+                    }?;
+                }
                 write!(fo, "{}", &line[start..start + slen])?;
                 write!(fo, "{}", space.repeat(cmt_width - slen))?;
                 write!(fo, "{}│{}", space, eol)?;
