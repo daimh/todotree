@@ -69,8 +69,7 @@ todotree -o term -i name-only.md > name-only.term && cat name-only.term
 
 - show the output on the fly while editing
 ```
-watch -c todotree
-while clear; todotree; sleep 2; done
+todotree -r
 ```
 
 - other formats

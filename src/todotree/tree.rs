@@ -52,6 +52,7 @@ impl Tree {
         dpth_limit: i32,
         separator: &str,
         color: bool,
+        strict: bool,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -119,7 +120,9 @@ impl Tree {
                 }
             }
         }
-        tree.get_todos_in_dep_only()?;
+        if !strict {
+            tree.add_todos_in_dep_only()?;
+        }
         let mut path: BTreeSet<String> = BTreeSet::new();
         let mut visited: BTreeSet<String> = BTreeSet::new();
         tree.root.borrow_mut().build_tree(
@@ -264,7 +267,7 @@ impl Tree {
     }
 
     /// Returns the todos that are defined in dependencies only.
-    fn get_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
+    fn add_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
         let mut noparent: BTreeSet<&String> =
             BTreeSet::from_iter(self.dict.keys());
         let mut todoindepsonly: HashMap<String, (String, Todo)> =

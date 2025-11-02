@@ -103,7 +103,10 @@ impl Todo {
                 });
             }
             let child = map.get(&dep).unwrap_or_else(|| {
-                panic!("ERR-003: Todo {} is missing in the markdown file", &dep)
+                panic!(
+                    "ERR-003: Todo '{}' is missing in the markdown file",
+                    &dep
+                )
             });
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
