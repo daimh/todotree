@@ -12,6 +12,13 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
     opts.optflag("C", "no-color", "Disable color output.");
+    opts.optflag("M", "hide-comment", "Hide column 'comment'.");
+    opts.optflag("O", "hide-owner", "Hide column 'owner'.");
+    opts.optflag(
+        "S",
+        "strict",
+        "Require explicit definitions for todos in dependencies, or raise ERR-003."
+    );
     opts.optopt(
         "d",
         "depth",
@@ -30,16 +37,11 @@ fn main() -> ExitCode {
         "Set output format to 'html', 'json', 'md', or 'term' (default: 'term')",
         "FORMAT",
     );
-    opts.optflag("q", "hide", "Hide completed TODO items.");
+    opts.optflag("q", "hide-completed", "Hide completed TODO items.");
     opts.optflag(
         "r",
         "refresh",
         "Automatically refresh the tree when the input file changes.",
-    );
-    opts.optflag(
-        "S", 
-        "strict", 
-        "Require explicit definitions for todos in dependencies, or raise ERR-003."
     );
     opts.optopt(
         "s",
@@ -140,11 +142,13 @@ fn print_tree(matches: &Matches, mdfile: &String, targets: &[String]) -> bool {
         targets,
         0,
         &format,
-        matches.opt_present("hide"),
+        matches.opt_present("hide-completed"),
         depth,
         &separator,
         !matches.opt_present("no-color"),
         matches.opt_present("strict"),
+        matches.opt_present("hide-comment"),
+        matches.opt_present("hide-owner"),
     ) {
         Ok(tree) => {
             print!("{}", tree);
@@ -178,7 +182,7 @@ Visualize tasks as a dependency tree instead of a flat list.
 todotree highlights complex relationships and color-codes task statuses,
 combining the structure of Makefiles with the readability of Markdown.
 
-Examples: 
+Examples:
     todotree
     todotree -i examples/minimalist.md
 

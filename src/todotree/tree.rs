@@ -48,11 +48,13 @@ impl Tree {
         targets: &[String],
         term_width: usize,
         format: &str,
-        hide: bool,
+        hide_completed: bool,
         dpth_limit: i32,
         separator: &str,
         color: bool,
         strict: bool,
+        hide_comment: bool,
+        hide_owner: bool,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -97,7 +99,7 @@ impl Tree {
             auxilaries: Vec::new(),
             color: color,
         };
-        let todolist = tree.readmd(mdfile)?;
+        let todolist = tree.readmd(mdfile, hide_comment, hide_owner)?;
         if tree.root.borrow().dependencies.len() == 0 {
             let mut noparent: BTreeSet<&String> =
                 BTreeSet::from_iter(tree.dict.keys());
@@ -132,7 +134,7 @@ impl Tree {
             &mut path,
             0,
             screen_width,
-            hide,
+            hide_completed,
             dpth_limit,
             &format_enum,
         )?;
@@ -170,7 +172,12 @@ impl Tree {
     }
 
     /// Creates a list of todos from a markdown fie.
-    fn readmd(&mut self, mdfile: &str) -> Result<Vec<String>, TodoError> {
+    fn readmd(
+        &mut self,
+        mdfile: &str,
+        hide_comment: bool,
+        hide_owner: bool,
+    ) -> Result<Vec<String>, TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
         let mut comment: Vec<String> = Vec::new();
@@ -217,12 +224,16 @@ impl Tree {
                 dependencies = Vec::new();
                 auxilaries = Vec::new();
             } else if ln.starts_with("- @") {
-                if owner.len() > 0 {
-                    owner.push_str(" ");
+                if !hide_owner {
+                    if owner.len() > 0 {
+                        owner.push_str(" ");
+                    }
+                    owner.push_str(ln.get(3..).unwrap().trim())
                 }
-                owner.push_str(ln.get(3..).unwrap().trim())
             } else if ln.starts_with("- %") {
-                comment.push(ln.get(3..).unwrap().trim().to_string());
+                if !hide_comment {
+                    comment.push(ln.get(3..).unwrap().trim().to_string());
+                }
             } else if ln.starts_with("- :") {
                 dependencies.append(
                     &mut ln
