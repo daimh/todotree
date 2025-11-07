@@ -102,12 +102,17 @@ impl Todo {
                     ),
                 });
             }
-            let child = map.get(&dep).unwrap_or_else(|| {
-                panic!(
-                    "ERR-003: Todo '{}' is missing in the markdown file",
-                    &dep
-                )
-            });
+            let child = match map.get(&dep) {
+                Some(m) => m,
+                None => {
+                    return Err(TodoError {
+                        msg: format!(
+                            "ERR-003: Todo '{}' is missing in the markdown file",
+                            &dep
+                        ),
+                    });
+                }
+            };
             let dep_notdone = child.borrow().status != Status::Completed;
             if dep_notdone {
                 notdonedeps.push(dep.clone());
@@ -212,7 +217,7 @@ impl Todo {
         visited: &mut BTreeSet<String>,
         maxlens: &[usize; 3],
         format: &Format,
-        color: bool,
+        no_color: bool,
     ) -> fmt::Result {
         let space: String;
         match format {
@@ -264,7 +269,7 @@ impl Todo {
                 space = String::from(" ");
                 let bol = String::new();
                 self.fmt_connector(fo, connectors, &space, &bol)?;
-                if color {
+                if !no_color {
                     match self.status {
                         Status::Completed => {
                             write!(fo, "\x1b\x5b\x33\x34\x6d")?
@@ -276,7 +281,7 @@ impl Todo {
                     }
                 }
                 write!(fo, "{}", self.name)?;
-                if color && self.status != Status::Pending {
+                if !no_color && self.status != Status::Pending {
                     write!(fo, "\x1b\x28\x42\x1b\x5b\x6d")?;
                 }
                 let eol = String::from("\n");
@@ -287,7 +292,7 @@ impl Todo {
                 let bol = String::from(HTMLP);
                 let eol = String::from("</p>\n");
                 self.fmt_connector(fo, connectors, &space, &bol)?;
-                if color {
+                if !no_color {
                     match self.status {
                         Status::Completed => {
                             write!(fo, "<span style='color:blue'>")?
@@ -299,7 +304,7 @@ impl Todo {
                     }
                 }
                 write!(fo, "{}", self.name)?;
-                if color && self.status != Status::Pending {
+                if !no_color && self.status != Status::Pending {
                     write!(fo, "</span>")?;
                 }
                 self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
@@ -312,7 +317,7 @@ impl Todo {
                     writeln!(fo, "{}    ,", space)?;
                 }
                 child.borrow().fmt_tree(
-                    fo, connectors, visited, maxlens, format, color,
+                    fo, connectors, visited, maxlens, format, no_color,
                 )?;
                 connectors.pop();
             }

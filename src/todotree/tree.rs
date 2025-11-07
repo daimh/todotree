@@ -20,8 +20,8 @@ pub struct Tree {
     separator: String,
     /// auxilary lines before the first todo
     auxilaries: Vec<String>,
-    /// color
-    color: bool,
+    /// no color
+    no_color: bool,
 }
 
 impl fmt::Display for Tree {
@@ -35,7 +35,7 @@ impl fmt::Display for Tree {
             &mut visited,
             &self.maxlens,
             &self.format,
-            self.color,
+            self.no_color,
         )?;
         Ok(())
     }
@@ -51,8 +51,8 @@ impl Tree {
         hide_completed: bool,
         dpth_limit: i32,
         separator: &str,
-        color: bool,
-        strict: bool,
+        no_color: bool,
+        auto_add: bool,
         hide_comment: bool,
         hide_owner: bool,
     ) -> Result<Self, TodoError> {
@@ -97,7 +97,7 @@ impl Tree {
             dict: HashMap::new(),
             separator: String::from(separator),
             auxilaries: Vec::new(),
-            color: color,
+            no_color: no_color,
         };
         let todolist = tree.readmd(mdfile, hide_comment, hide_owner)?;
         if tree.root.borrow().dependencies.len() == 0 {
@@ -122,9 +122,7 @@ impl Tree {
                 }
             }
         }
-        if !strict {
-            tree.add_todos_in_dep_only()?;
-        }
+        tree.check_todos_in_dep_only(auto_add)?;
         let mut path: BTreeSet<String> = BTreeSet::new();
         let mut visited: BTreeSet<String> = BTreeSet::new();
         tree.root.borrow_mut().build_tree(
@@ -278,7 +276,10 @@ impl Tree {
     }
 
     /// Returns the todos that are defined in dependencies only.
-    fn add_todos_in_dep_only(&mut self) -> Result<(), TodoError> {
+    fn check_todos_in_dep_only(
+        &mut self,
+        auto_add: bool,
+    ) -> Result<(), TodoError> {
         let mut noparent: BTreeSet<&String> =
             BTreeSet::from_iter(self.dict.keys());
         let mut todoindepsonly: HashMap<String, (String, Todo)> =
@@ -317,19 +318,21 @@ impl Tree {
                         }
                     }
                     None => {
-                        todoindepsonly.insert(
-                            dep_nom.clone(),
-                            (
-                                String::from(key),
-                                Todo::new(
-                                    dep_raw.clone(),
-                                    String::new(),
-                                    Vec::new(),
-                                    Vec::new(),
-                                    Vec::new(),
-                                )?,
-                            ),
-                        );
+                        if auto_add {
+                            todoindepsonly.insert(
+                                dep_nom.clone(),
+                                (
+                                    String::from(key),
+                                    Todo::new(
+                                        dep_raw.clone(),
+                                        String::new(),
+                                        Vec::new(),
+                                        Vec::new(),
+                                        Vec::new(),
+                                    )?,
+                                ),
+                            );
+                        }
                     }
                 }
             }

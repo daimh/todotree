@@ -11,14 +11,14 @@ use todotree::tree::Tree;
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
+    opts.optflag(
+        "A",
+        "auto-add",
+        "Automatically add empty definitions for todos that appear only in dependencies, without raising ERR-003."
+    );
     opts.optflag("C", "no-color", "Disable color output.");
     opts.optflag("M", "hide-comment", "Hide column 'comment'.");
     opts.optflag("O", "hide-owner", "Hide column 'owner'.");
-    opts.optflag(
-        "S",
-        "strict",
-        "Require explicit definitions for todos in dependencies, or raise ERR-003."
-    );
     opts.optopt(
         "d",
         "depth",
@@ -145,8 +145,8 @@ fn print_tree(matches: &Matches, mdfile: &String, targets: &[String]) -> bool {
         matches.opt_present("hide-completed"),
         depth,
         &separator,
-        !matches.opt_present("no-color"),
-        matches.opt_present("strict"),
+        matches.opt_present("no-color"),
+        matches.opt_present("auto-add"),
         matches.opt_present("hide-comment"),
         matches.opt_present("hide-owner"),
     ) {
@@ -183,11 +183,13 @@ todotree highlights complex relationships and color-codes task statuses,
 combining the structure of Makefiles with the readability of Markdown.
 
 Examples:
+	cd examples
     todotree
-    todotree -i examples/minimalist.md
+    todotree -i todotree.md
+    todotree -i todotree.md lawn
+    todotree -Ai minimalist.md
 
-Repository:
-    https://github.com/daimh/todotree"
+Repository: https://github.com/daimh/todotree"
         )
     );
 }

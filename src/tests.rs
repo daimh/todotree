@@ -25,8 +25,8 @@ fn examples() {
                     hide,
                     depth,
                     "\n",
-                    true,
                     false,
+                    true,
                     false,
                     false,
                 );
@@ -71,10 +71,13 @@ fn errors() {
             _ => vec![md[18..].replace(".md", ""); 1],
         };
         match Tree::new(
-            &md, &target, 0, "term", false, 0, " ", true, false, false, false,
+            &md, &target, 0, "term", false, 0, " ", false, false, false, false,
         ) {
             Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
-            _ => panic!("ERR-905"),
+            _ => {
+                println!("ERR-905: {}", md);
+                panic!("ERR-905");
+            }
         }
     }
 }
