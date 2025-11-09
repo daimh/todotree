@@ -111,7 +111,8 @@ impl Tree {
                 if noparent.len() == 0 {
                     return Err(TodoError {
                         msg: String::from(
-                            "ERR-007: All todos are in dependency loops",
+                            "ERR-007: Failed to find root node, as all todos \
+                             are in dependency loops",
                         ),
                     });
                 }
@@ -294,8 +295,8 @@ impl Tree {
                         return Err(TodoError {
                             msg: format!(
                                 "ERR-011: Todo '{}' has its own '# ' line, \
-									then it should not have '~' in '{}'s \
-									dependencies list.",
+                                 then it should not have '~' in '{}'s \
+                                 dependencies list.",
                                 dep_nom, key
                             ),
                         });
@@ -310,8 +311,8 @@ impl Tree {
                             return Err(TodoError {
                                 msg: format!(
                                     "ERR-012: Todo '{}' has a dependency \
-									'~{}', but todo '{}' has a dependency \
-									'{}'.",
+                                     '~{}', but todo '{}' has a dependency \
+                                     '{}'.",
                                     key, dep_nom, parent_todo.0, dep_nom
                                 ),
                             });
@@ -363,7 +364,7 @@ impl Tree {
                 return Err(TodoError {
                     msg: String::from(
                         "ERR-013: Missing '# [TODO]' before '- @', '- :', \
-						or '-  %' in the todotree markdown file.",
+                         or '-  %' in the todotree markdown file.",
                     ),
                 });
             }

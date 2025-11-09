@@ -56,7 +56,7 @@ impl Todo {
                         msg: format!(
                             "ERR-001: Todo name '{}' contains unsupported \
                             character '{}', which is not alphabet, digit, \
-							or {:?}",
+                            or {:?}",
                             name, c, SPECIALS
                         ),
                     });
@@ -200,7 +200,7 @@ impl Todo {
                         "ERR-005: Screen width is {}, but this todotree \
                         needs at least {} columns",
                         screen_width,
-                        maxlens[0] + maxlens[1] + 8
+                        maxlens[0] + maxlens[1] + 9
                     ),
                 });
             }

@@ -66,17 +66,27 @@ fn errors() {
         if !md.ends_with(".md") || !md.starts_with("src/tests/ERR-") {
             continue;
         }
-        let target = match md.len() {
-            20 => Vec::<String>::new(),
-            _ => vec![md[18..].replace(".md", ""); 1],
-        };
+        if md.len() < 20 {
+            panic!("ERR-906: {}", md);
+        }
+        let options = md[17..].replace(".md", "");
+        let auto_add = options.contains('A');
         match Tree::new(
-            &md, &target, 0, "term", false, 0, " ", false, false, false, false,
+            &md,
+            &vec![],
+            80,
+            "term",
+            false,
+            0,
+            " ",
+            false,
+            auto_add,
+            false,
+            false,
         ) {
             Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
             _ => {
-                println!("ERR-905: {}", md);
-                panic!("ERR-905");
+                panic!("ERR-905: {}", md);
             }
         }
     }

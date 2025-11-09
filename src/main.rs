@@ -117,7 +117,7 @@ fn main() -> ExitCode {
 fn print_tree(matches: &Matches, mdfile: &String, targets: &[String]) -> bool {
     if matches.opt_present("refresh") {
         print!("\x1B[2J\x1B[1;1H");
-        io::stdout().flush().expect("ERR-020");
+        io::stdout().flush().expect("ERR-021: refresh console");
     }
     let format = match matches.opt_str("format") {
         Some(x) => x,
@@ -183,7 +183,7 @@ todotree highlights complex relationships and color-codes task statuses,
 combining the structure of Makefiles with the readability of Markdown.
 
 Examples:
-	cd examples
+    cd examples
     todotree
     todotree -i todotree.md
     todotree -i todotree.md lawn
