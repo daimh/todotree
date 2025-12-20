@@ -1,4 +1,5 @@
 use getopts::{Matches, Options};
+use std::collections::HashMap;
 use std::env;
 use std::io::{self, ErrorKind, Write};
 use std::process::ExitCode;
@@ -32,10 +33,16 @@ fn main() -> ExitCode {
         "MARKDOWN",
     );
     opts.optopt(
-        "o",
+        "f",
         "format",
         "Set output format to 'html', 'json', 'md', or 'term' (default: 'term')",
         "FORMAT",
+    );
+    opts.optopt(
+        "o",
+        "owners",
+        "Filter TODOs by a comma-separated list of owners",
+        "STRING",
     );
     opts.optflag("q", "hide-completed", "Hide completed TODO items.");
     opts.optflag(
@@ -70,12 +77,19 @@ fn main() -> ExitCode {
         Some(x) => x,
         None => String::from("todotree.md"),
     };
+    let mut owners: HashMap<String, bool> = match matches.opt_str("owners") {
+        Some(x) => x
+            .split(",")
+            .map(|s| (s.to_string(), false))
+            .collect::<HashMap<String, bool>>(),
+        None => HashMap::<String, bool>::new(),
+    };
     let free = &matches.free;
     let targets = match free.is_empty() {
         true => &vec![],
         false => free,
     };
-    if !print_tree(&matches, &mdfile, targets) {
+    if !print_tree(&matches, &mdfile, &mut owners, targets) {
         return ExitCode::FAILURE;
     }
     if matches.opt_present("refresh") {
@@ -106,7 +120,7 @@ fn main() -> ExitCode {
             inotify
                 .read_events_blocking(&mut buffer)
                 .expect("ERR-020: reading events");
-            if !print_tree(&matches, &mdfile, targets) {
+            if !print_tree(&matches, &mdfile, &mut owners, targets) {
                 return ExitCode::FAILURE;
             }
         }
@@ -114,7 +128,12 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn print_tree(matches: &Matches, mdfile: &String, targets: &[String]) -> bool {
+fn print_tree(
+    matches: &Matches,
+    mdfile: &String,
+    owners: &mut HashMap<String, bool>,
+    targets: &[String],
+) -> bool {
     if matches.opt_present("refresh") {
         print!("\x1B[2J\x1B[1;1H");
         io::stdout().flush().expect("ERR-021: refresh console");
@@ -139,6 +158,7 @@ fn print_tree(matches: &Matches, mdfile: &String, targets: &[String]) -> bool {
     };
     match Tree::new(
         mdfile,
+        owners,
         targets,
         0,
         &format,
@@ -185,6 +205,7 @@ combining the structure of Makefiles with the readability of Markdown.
 Examples:
     cd examples
     todotree
+    todotree -o Avery,Dad
     todotree -i todotree.md
     todotree -i todotree.md lawn
     todotree -Ai minimalist.md

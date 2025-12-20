@@ -45,6 +45,7 @@ impl Tree {
     /// Creates a tree from a markdown file.
     pub fn new(
         mdfile: &str,
+        owners: &mut HashMap<String, bool>,
         targets: &[String],
         term_width: usize,
         format: &str,
@@ -100,6 +101,27 @@ impl Tree {
             no_color: no_color,
         };
         let todolist = tree.readmd(mdfile, hide_comment, hide_owner)?;
+        // filter the tree by a list of owners
+        if owners.len() > 0 {
+            for todo in tree.dict.values() {
+                let td = todo.borrow();
+                if owners.contains_key(&td.owner) {
+                    tree.root.borrow_mut().dependencies.push(td.name.clone());
+                    owners.insert(td.owner.clone(), true);
+                }
+            }
+            for (owner, used) in owners.iter() {
+                if !*used {
+                    return Err(TodoError {
+                        msg: format!(
+                            "ERR-022: no such owner '{}' in the markdown file",
+                            owner
+                        ),
+                    });
+                }
+            }
+        }
+        // add all TODOs that have no parent to ROOT's dependencies
         if tree.root.borrow().dependencies.len() == 0 {
             let mut noparent: BTreeSet<&String> =
                 BTreeSet::from_iter(tree.dict.keys());

@@ -19,6 +19,7 @@ fn examples() {
             for format in vec!["term", "json", "html", "md"] {
                 let result = Tree::new(
                     &md,
+                    &mut HashMap::<String, bool>::new(),
                     &mut Vec::<String>::new(),
                     80,
                     format,
@@ -73,6 +74,7 @@ fn errors() {
         let auto_add = options.contains('A');
         match Tree::new(
             &md,
+            &mut HashMap::<String, bool>::new(),
             &vec![],
             80,
             "term",

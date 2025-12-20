@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 pub struct Todo {
     pub name: String,
-    owner: String,
+    pub owner: String,
     comment: Vec<String>,
     pub dependencies: Vec<String>,
     /// the markdown file lines following each todo
