@@ -9,6 +9,7 @@ fn examples() {
         if !md.ends_with(".md") {
             continue;
         }
+		let inputs = vec![md.clone()];
         for idx in 0..4 {
             let (hide, depth, outdir) = match idx {
                 0 => (false, 0, "examples/output/"),
@@ -18,8 +19,8 @@ fn examples() {
             };
             for format in vec!["term", "json", "html", "md"] {
                 let result = Tree::new(
-                    &md,
-                    &mut HashMap::<String, bool>::new(),
+                    &inputs,
+                    &mut BTreeMap::<String, bool>::new(),
                     &mut Vec::<String>::new(),
                     80,
                     format,
@@ -70,11 +71,23 @@ fn errors() {
         if md.len() < 20 {
             panic!("ERR-906: {}", md);
         }
+		let inputs = vec![md.clone()];
         let options = md[17..].replace(".md", "");
-        let auto_add = options.contains('A');
+        let mut auto_add = false;
+        let mut owners = BTreeMap::<String, bool>::new();
+        for opt in options.split("-") {
+            if opt.starts_with('A') {
+                auto_add = true;
+            } else if opt.starts_with('o') {
+                owners = opt[1..]
+                    .split(",")
+                    .map(|s| (s.to_string(), false))
+                    .collect();
+            }
+        }
         match Tree::new(
-            &md,
-            &mut HashMap::<String, bool>::new(),
+            &inputs,
+            &mut owners,
             &vec![],
             80,
             "term",

@@ -1,7 +1,7 @@
 use super::{Format, HTMLP, ROOT, Status, TodoError};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, BTreeMap};
 use std::fmt;
 use std::rc::Rc;
 
@@ -82,7 +82,7 @@ impl Todo {
     pub fn build_tree(
         &mut self,
         visited: &mut BTreeSet<String>,
-        map: &HashMap<String, Rc<RefCell<Todo>>>,
+        map: &BTreeMap<String, Rc<RefCell<Todo>>>,
         maxlens: &mut [usize; 3],
         path: &mut BTreeSet<String>,
         depth: usize,

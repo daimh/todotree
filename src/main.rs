@@ -1,5 +1,5 @@
 use getopts::{Matches, Options};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::io::{self, ErrorKind, Write};
 use std::process::ExitCode;
@@ -15,53 +15,50 @@ fn main() -> ExitCode {
     opts.optflag(
         "A",
         "auto-add",
-        "Automatically add empty definitions for todos that appear only in dependencies, without raising ERR-003."
+        "Auto-add missing TODO definitions from dependencies.",
     );
     opts.optflag("C", "no-color", "Disable color output.");
-    opts.optflag("M", "hide-comment", "Hide column 'comment'.");
-    opts.optflag("O", "hide-owner", "Hide column 'owner'.");
+    opts.optflag("M", "hide-comment", "Hide comment column.");
+    opts.optflag("O", "hide-owner", "Hide owner column.");
     opts.optopt(
         "d",
         "depth",
-        "Limit the displayed tree depth. A negative value hides leaf nodes.",
-        "DEPTH",
+        "Limit tree depth. A negative value hides leaf nodes.",
+        "N",
     );
-    opts.optopt(
+    opts.optmulti(
         "i",
         "input",
-        "Use MARKDOWN file as input (default:  'todotree.md')",
-        "MARKDOWN",
+        "Read TODOs from FILE (default:  'todotree.md'). \
+			May be specified multiple times.",
+        "FILE",
     );
     opts.optopt(
         "f",
         "format",
-        "Set output format to 'html', 'json', 'md', or 'term' (default: 'term')",
+        "Output format: term | md | html | json (default: term).",
         "FORMAT",
     );
-    opts.optopt(
+    opts.optmulti(
         "o",
-        "owners",
-        "Filter TODOs by a comma-separated list of owners",
-        "STRING",
+        "owner",
+        "Show only TODOs owned by OWNER. May be specified multiple times.",
+        "OWNER",
     );
-    opts.optflag("q", "hide-completed", "Hide completed TODO items.");
-    opts.optflag(
-        "r",
-        "refresh",
-        "Automatically refresh the tree when the input file changes.",
-    );
+    opts.optflag("q", "hide-completed", "Hide completed TODOs.");
+    opts.optflag("r", "refresh", "Auto-refresh when input file changes.");
     opts.optopt(
         "s",
         "separator",
-        "Use STRING instead of \"\\n\" to join multi-line comments.",
+        "Join multi-line comments with STRING (default: \"\\n\").",
         "STRING",
     );
-    opts.optflag("h", "help", "Show this help message and exit.");
+    opts.optflag("h", "help", "Show this help and exit.");
     opts.optflag("", "version", "Show version information and exit.");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            eprintln!("{}", f.to_string());
+            eprintln!("ERR-023: {}", f.to_string());
             return ExitCode::FAILURE;
         }
     };
@@ -73,23 +70,21 @@ fn main() -> ExitCode {
         print_usage(&opts);
         return ExitCode::SUCCESS;
     }
-    let mdfile = match matches.opt_str("input") {
-        Some(x) => x,
-        None => String::from("todotree.md"),
-    };
-    let mut owners: HashMap<String, bool> = match matches.opt_str("owners") {
-        Some(x) => x
-            .split(",")
-            .map(|s| (s.to_string(), false))
-            .collect::<HashMap<String, bool>>(),
-        None => HashMap::<String, bool>::new(),
-    };
+    let mut inputs = matches.opt_strs("input");
+    if inputs.len() == 0 {
+        inputs = vec!["todotree.md".to_string()];
+    }
+    let mut owners: BTreeMap<String, bool> = matches
+        .opt_strs("owner")
+        .into_iter()
+        .map(|s| (s.to_string(), false))
+        .collect::<BTreeMap<String, bool>>();
     let free = &matches.free;
     let targets = match free.is_empty() {
         true => &vec![],
         false => free,
     };
-    if !print_tree(&matches, &mdfile, &mut owners, targets) {
+    if !print_tree(&matches, &inputs, &mut owners, targets) {
         return ExitCode::FAILURE;
     }
     if matches.opt_present("refresh") {
@@ -103,26 +98,26 @@ fn main() -> ExitCode {
         };
         loop {
             let mut inotify = Inotify::init().expect("ERR-017: inotify init");
-            match inotify
-                .watches()
-                .add(&mdfile, WatchMask::MODIFY | WatchMask::CLOSE)
-            {
-                Ok(_) => (),
-                Err(e) => match e.kind() {
-                    ErrorKind::NotFound => {
-                        thread::sleep(Duration::from_secs(1));
-                        continue;
-                    }
-                    _ => panic!("ERR-019: inotify watch, {}", e),
-                },
+            for mdfile in &inputs {
+                match inotify
+                    .watches()
+                    .add(&mdfile, WatchMask::MODIFY | WatchMask::CLOSE)
+                {
+                    Ok(_) => (),
+                    Err(e) => match e.kind() {
+                        ErrorKind::NotFound => {
+                            thread::sleep(Duration::from_secs(1));
+                            continue;
+                        }
+                        _ => panic!("ERR-019: inotify watch, {}", e),
+                    },
+                }
             }
             let mut buffer = [0; 1024];
             inotify
                 .read_events_blocking(&mut buffer)
                 .expect("ERR-020: reading events");
-            if !print_tree(&matches, &mdfile, &mut owners, targets) {
-                return ExitCode::FAILURE;
-            }
+            print_tree(&matches, &inputs, &mut owners, targets);
         }
     }
     ExitCode::SUCCESS
@@ -130,8 +125,8 @@ fn main() -> ExitCode {
 
 fn print_tree(
     matches: &Matches,
-    mdfile: &String,
-    owners: &mut HashMap<String, bool>,
+    inputs: &Vec<String>,
+    owners: &mut BTreeMap<String, bool>,
     targets: &[String],
 ) -> bool {
     if matches.opt_present("refresh") {
@@ -157,7 +152,7 @@ fn print_tree(
         None => String::from("\n"),
     };
     match Tree::new(
-        mdfile,
+        inputs,
         owners,
         targets,
         0,
@@ -198,19 +193,21 @@ fn print_usage(opts: &Options) {
             "\
 Usage: todotree [options] [TODO]...
 
+Description:
 Visualize tasks as a dependency tree instead of a flat list.
-todotree highlights complex relationships and color-codes task statuses,
-combining the structure of Makefiles with the readability of Markdown.
+Highlights dependencies, color-codes task status, and uses a Markdown-like
+format.
+
+Repository: https://github.com/daimh/todotree
 
 Examples:
     cd examples
     todotree
-    todotree -o Avery,Dad
+    todotree -o Avery -o Dad
     todotree -i todotree.md
     todotree -i todotree.md lawn
-    todotree -Ai minimalist.md
-
-Repository: https://github.com/daimh/todotree"
+    todotree -A -i minimalist.md
+"
         )
     );
 }

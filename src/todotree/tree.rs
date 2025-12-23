@@ -1,7 +1,7 @@
 use super::{Format, HTMLP, ROOT, Status, TodoError, todo::Todo};
 use libc::{STDOUT_FILENO, TIOCGWINSZ, ioctl, winsize};
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, BTreeMap};
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
@@ -15,7 +15,7 @@ pub struct Tree {
     /// maximum length of the three columns
     maxlens: [usize; 3],
     /// a map of todos, key is map name
-    dict: HashMap<String, Rc<RefCell<Todo>>>,
+    dict: BTreeMap<String, Rc<RefCell<Todo>>>,
     /// a separator joining multiple lines of comments
     separator: String,
     /// auxilary lines before the first todo
@@ -44,8 +44,8 @@ impl fmt::Display for Tree {
 impl Tree {
     /// Creates a tree from a markdown file.
     pub fn new(
-        mdfile: &str,
-        owners: &mut HashMap<String, bool>,
+        inputs: &Vec<String>,
+        owners: &mut BTreeMap<String, bool>,
         targets: &[String],
         term_width: usize,
         format: &str,
@@ -95,12 +95,22 @@ impl Tree {
             )?)),
             format: format_enum.clone(),
             maxlens: [0; 3],
-            dict: HashMap::new(),
+            dict: BTreeMap::new(),
             separator: String::from(separator),
             auxilaries: Vec::new(),
             no_color: no_color,
         };
-        let todolist = tree.readmd(mdfile, hide_comment, hide_owner)?;
+		for mdfile in inputs {
+	        tree.readmd(mdfile, hide_comment, hide_owner)?;
+		}
+		// check dict
+        if tree.dict.len() == 0 {
+            return Err(TodoError {
+                msg: String::from(
+                    "ERR-010: The markdown file does not have any Todo",
+                ),
+            });
+        }
         // filter the tree by a list of owners
         if owners.len() > 0 {
             for todo in tree.dict.values() {
@@ -139,7 +149,7 @@ impl Tree {
                     });
                 }
             }
-            for nm in todolist {
+            for nm in tree.dict.keys() {
                 if noparent.contains(&nm) {
                     tree.root.borrow_mut().dependencies.push(nm.clone());
                 }
@@ -198,7 +208,7 @@ impl Tree {
         mdfile: &str,
         hide_comment: bool,
         hide_owner: bool,
-    ) -> Result<Vec<String>, TodoError> {
+    ) -> Result<(), TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
         let mut comment: Vec<String> = Vec::new();
@@ -212,7 +222,6 @@ impl Tree {
                 });
             }
         };
-        let mut todolist: Vec<String> = Vec::new();
         for ln in buffer.lines() {
             let ln = ln.trim();
             if ln.starts_with("# ") {
@@ -222,7 +231,6 @@ impl Tree {
                     comment,
                     dependencies,
                     auxilaries,
-                    &mut todolist,
                 )?;
                 name = match ln.get(2..) {
                     Some(x) => x.trim().to_string(),
@@ -286,16 +294,7 @@ impl Tree {
             comment,
             dependencies,
             auxilaries,
-            &mut todolist,
-        )?;
-        match self.dict.len() {
-            0 => Err(TodoError {
-                msg: String::from(
-                    "ERR-010: The markdown file does not have any Todo",
-                ),
-            }),
-            _ => Ok(todolist),
-        }
+        )
     }
 
     /// Returns the todos that are defined in dependencies only.
@@ -305,8 +304,8 @@ impl Tree {
     ) -> Result<(), TodoError> {
         let mut noparent: BTreeSet<&String> =
             BTreeSet::from_iter(self.dict.keys());
-        let mut todoindepsonly: HashMap<String, (String, Todo)> =
-            HashMap::new();
+        let mut todoindepsonly: BTreeMap<String, (String, Todo)> =
+            BTreeMap::new();
         for (key, todo) in &self.dict {
             for dep_raw in &todo.borrow().dependencies {
                 let dep_nom = String::from(dep_raw.replace("~", "").trim());
@@ -376,7 +375,6 @@ impl Tree {
         comment: Vec<String>,
         dependencies: Vec<String>,
         auxilaries: Vec<String>,
-        todolist: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         if name == "" {
             self.auxilaries = auxilaries;
@@ -399,7 +397,6 @@ impl Tree {
         };
         let todo = Todo::new(name, owner, comt, dependencies, auxilaries)?;
         let nm = todo.name.clone();
-        todolist.push(nm.clone());
         if self
             .dict
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))
