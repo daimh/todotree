@@ -9,15 +9,18 @@ fn examples() {
         if !md.ends_with(".md") {
             continue;
         }
-		let inputs = vec![md.clone()];
-        for idx in 0..4 {
-            let (hide, depth, outdir) = match idx {
-                0 => (false, 0, "examples/output/"),
-                1 => (true, 0, "examples/hide/"),
-                2 => (false, 2, "examples/depth/pos2/"),
-                _ => (false, -1, "examples/depth/neg1/"),
+        let inputs = vec![md.clone()];
+        let f4 = vec!["term", "json", "html", "md"];
+        let f2 = vec!["term", "html"];
+        for idx in 0..5 {
+            let (hide, depth, outdir, reverse, formats) = match idx {
+                0 => (false, 0, "examples/output/", false, &f4),
+                1 => (true, 0, "examples/hide/", false, &f4),
+                2 => (false, 2, "examples/depth/pos2/", false, &f4),
+                3 => (false, -1, "examples/depth/neg1/", false, &f4),
+                _ => (false, 0, "examples/reverse/", true, &f2),
             };
-            for format in vec!["term", "json", "html", "md"] {
+            for format in formats {
                 let result = Tree::new(
                     &inputs,
                     &mut BTreeMap::<String, bool>::new(),
@@ -31,6 +34,7 @@ fn examples() {
                     true,
                     false,
                     false,
+                    reverse,
                 );
                 let tree = match result {
                     Ok(t) => t,
@@ -71,7 +75,7 @@ fn errors() {
         if md.len() < 20 {
             panic!("ERR-906: {}", md);
         }
-		let inputs = vec![md.clone()];
+        let inputs = vec![md.clone()];
         let options = md[17..].replace(".md", "");
         let mut auto_add = false;
         let mut owners = BTreeMap::<String, bool>::new();
@@ -96,6 +100,7 @@ fn errors() {
             " ",
             false,
             auto_add,
+            false,
             false,
             false,
         ) {
