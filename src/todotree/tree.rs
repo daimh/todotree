@@ -1,7 +1,7 @@
-use super::{Format, HTMLP, ROOT, Status, TodoError, todo::Todo};
+use super::{Format, ROOT, Status, TodoError, todo::Todo};
 use libc::{STDOUT_FILENO, TIOCGWINSZ, ioctl, winsize};
 use std::cell::RefCell;
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::read_to_string;
 use std::rc::Rc;
@@ -22,11 +22,17 @@ pub struct Tree {
     auxilaries: Vec<String>,
     /// no color
     no_color: bool,
+    /// reverse
+    reverse: bool,
 }
 
 impl fmt::Display for Tree {
     fn fmt(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt_header(fo)?;
+        if self.format == Format::Md {
+            for ln in &self.auxilaries {
+                writeln!(fo, "{}", ln)?;
+            }
+        }
         let mut connectors: Vec<bool> = Vec::new();
         let mut visited: BTreeSet<String> = BTreeSet::new();
         self.root.borrow().fmt_tree(
@@ -36,6 +42,7 @@ impl fmt::Display for Tree {
             &self.maxlens,
             &self.format,
             self.no_color,
+            self.reverse,
         )?;
         Ok(())
     }
@@ -49,13 +56,14 @@ impl Tree {
         targets: &[String],
         term_width: usize,
         format: &str,
-        hide_completed: bool,
+        hide_done: bool,
         dpth_limit: i32,
         separator: &str,
         no_color: bool,
         auto_add: bool,
         hide_comment: bool,
         hide_owner: bool,
+        reverse: bool,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -69,6 +77,14 @@ impl Tree {
                 });
             }
         };
+        if reverse && format_enum != Format::Term && format_enum != Format::Html
+        {
+            return Err(TodoError {
+                msg: String::from(
+                    "ERR-024: --reverse works with Term or Html only",
+                ),
+            });
+        }
         let mut screen_width: usize = 80;
         if format_enum == Format::Term && term_width == 0 {
             let mut ws = winsize {
@@ -99,11 +115,12 @@ impl Tree {
             separator: String::from(separator),
             auxilaries: Vec::new(),
             no_color: no_color,
+            reverse: reverse,
         };
-		for mdfile in inputs {
-	        tree.readmd(mdfile, hide_comment, hide_owner)?;
-		}
-		// check dict
+        for mdfile in inputs {
+            tree.readmd(mdfile, hide_comment, hide_owner)?;
+        }
+        // check dict
         if tree.dict.len() == 0 {
             return Err(TodoError {
                 msg: String::from(
@@ -111,30 +128,10 @@ impl Tree {
                 ),
             });
         }
-        // filter the tree by a list of owners
-        if owners.len() > 0 {
-            for todo in tree.dict.values() {
-                let td = todo.borrow();
-                if owners.contains_key(&td.owner) {
-                    tree.root.borrow_mut().dependencies.push(td.name.clone());
-                    owners.insert(td.owner.clone(), true);
-                }
-            }
-            for (owner, used) in owners.iter() {
-                if !*used {
-                    return Err(TodoError {
-                        msg: format!(
-                            "ERR-022: no such owner '{}' in the markdown file",
-                            owner
-                        ),
-                    });
-                }
-            }
-        }
         // add all TODOs that have no parent to ROOT's dependencies
         if tree.root.borrow().dependencies.len() == 0 {
-            let mut noparent: BTreeSet<&String> =
-                BTreeSet::from_iter(tree.dict.keys());
+            let mut noparent: BTreeSet<String> =
+                tree.dict.keys().cloned().collect();
             for todo in tree.dict.values() {
                 for dep in &todo.borrow().dependencies {
                     let dep = dep.replace("~", "");
@@ -150,7 +147,7 @@ impl Tree {
                 }
             }
             for nm in tree.dict.keys() {
-                if noparent.contains(&nm) {
+                if noparent.contains(nm) {
                     tree.root.borrow_mut().dependencies.push(nm.clone());
                 }
             }
@@ -165,15 +162,26 @@ impl Tree {
             &mut path,
             0,
             screen_width,
-            hide_completed,
+            hide_done,
             dpth_limit,
             &format_enum,
+            owners,
         )?;
+        for (owner, used) in owners.iter() {
+            if !*used {
+                return Err(TodoError {
+                    msg: format!(
+                        "ERR-022: no such owner '{}' in the markdown file",
+                        owner
+                    ),
+                });
+            }
+        }
         Ok(tree)
     }
 
     /// escape markdown string
-    fn escape(&mut self, input: &String) -> String {
+    fn escape(&mut self, input: &str) -> String {
         static SPECIALS: [char; 15] = [
             '\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-',
             '.', '!',
@@ -288,13 +296,7 @@ impl Tree {
                 auxilaries.push(String::from(ln));
             }
         }
-        self.new_todo_if_any(
-            name,
-            owner,
-            comment,
-            dependencies,
-            auxilaries,
-        )
+        self.new_todo_if_any(name, owner, comment, dependencies, auxilaries)
     }
 
     /// Returns the todos that are defined in dependencies only.
@@ -302,8 +304,8 @@ impl Tree {
         &mut self,
         auto_add: bool,
     ) -> Result<(), TodoError> {
-        let mut noparent: BTreeSet<&String> =
-            BTreeSet::from_iter(self.dict.keys());
+        let mut noparent: BTreeSet<String> =
+            self.dict.keys().cloned().collect();
         let mut todoindepsonly: BTreeMap<String, (String, Todo)> =
             BTreeMap::new();
         for (key, todo) in &self.dict {
@@ -405,44 +407,6 @@ impl Tree {
             return Err(TodoError {
                 msg: format!("ERR-014: Duplicated todo name '{}'", nm),
             });
-        }
-        Ok(())
-    }
-
-    /// Formats the output table header.
-    fn fmt_header(&self, fo: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.format {
-            Format::Json => (),
-            Format::Md => {
-                for ln in &self.auxilaries {
-                    writeln!(fo, "{}", ln)?;
-                }
-            }
-            _ => {
-                let space = match self.format {
-                    Format::Html => String::from("&nbsp;"),
-                    _ => String::from(" "),
-                };
-                if self.maxlens[1] + self.maxlens[2] > 0 {
-                    if self.format == Format::Html {
-                        write!(fo, "{}", HTMLP)?;
-                    }
-                    write!(fo, "{}", space.repeat(self.maxlens[0] + 1))?;
-                    write!(fo, "┌─")?;
-                    write!(fo, "{}", "─".repeat(self.maxlens[1]))?;
-                    if self.maxlens[1] > 0 && self.maxlens[2] > 0 {
-                        write!(fo, "─┬─")?;
-                    }
-                    write!(fo, "{}", "─".repeat(self.maxlens[2]))?;
-                    write!(fo, "─┐")?;
-                    if self.format == Format::Html {
-                        write!(fo, "</p>")?;
-                    }
-                    writeln!(fo)?;
-                } else {
-                    write!(fo, "")?;
-                }
-            }
         }
         Ok(())
     }

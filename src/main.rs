@@ -20,6 +20,7 @@ fn main() -> ExitCode {
     opts.optflag("C", "no-color", "Disable color output.");
     opts.optflag("M", "hide-comment", "Hide comment column.");
     opts.optflag("O", "hide-owner", "Hide owner column.");
+    opts.optflag("R", "reverse", "Reverse the tree order.");
     opts.optopt(
         "d",
         "depth",
@@ -45,13 +46,13 @@ fn main() -> ExitCode {
         "Show only TODOs owned by OWNER. May be specified multiple times.",
         "OWNER",
     );
-    opts.optflag("q", "hide-completed", "Hide completed TODOs.");
+    opts.optflag("q", "hide-done", "Hide completed TODOs.");
     opts.optflag("r", "refresh", "Auto-refresh when input file changes.");
     opts.optopt(
         "s",
         "separator",
         "Join multi-line comments with STRING (default: \"\\n\").",
-        "STRING",
+        "STR",
     );
     opts.optflag("h", "help", "Show this help and exit.");
     opts.optflag("", "version", "Show version information and exit.");
@@ -80,10 +81,7 @@ fn main() -> ExitCode {
         .map(|s| (s.to_string(), false))
         .collect::<BTreeMap<String, bool>>();
     let free = &matches.free;
-    let targets = match free.is_empty() {
-        true => &vec![],
-        false => free,
-    };
+    let targets = if free.is_empty() { &vec![] } else { free };
     if !print_tree(&matches, &inputs, &mut owners, targets) {
         return ExitCode::FAILURE;
     }
@@ -99,21 +97,20 @@ fn main() -> ExitCode {
         loop {
             let mut inotify = Inotify::init().expect("ERR-017: inotify init");
             for mdfile in &inputs {
-                match inotify
+                if let Err(e) = inotify
                     .watches()
                     .add(&mdfile, WatchMask::MODIFY | WatchMask::CLOSE)
                 {
-                    Ok(_) => (),
-                    Err(e) => match e.kind() {
+                    match e.kind() {
                         ErrorKind::NotFound => {
                             thread::sleep(Duration::from_secs(1));
                             continue;
                         }
                         _ => panic!("ERR-019: inotify watch, {}", e),
-                    },
+                    }
                 }
             }
-            let mut buffer = [0; 1024];
+            let mut buffer = [0u8; 4096];
             inotify
                 .read_events_blocking(&mut buffer)
                 .expect("ERR-020: reading events");
@@ -157,13 +154,14 @@ fn print_tree(
         targets,
         0,
         &format,
-        matches.opt_present("hide-completed"),
+        matches.opt_present("hide-done"),
         depth,
         &separator,
         matches.opt_present("no-color"),
         matches.opt_present("auto-add"),
         matches.opt_present("hide-comment"),
         matches.opt_present("hide-owner"),
+        matches.opt_present("reverse"),
     ) {
         Ok(tree) => {
             print!("{}", tree);
@@ -194,7 +192,7 @@ fn print_usage(opts: &Options) {
 Usage: todotree [options] [TODO]...
 
 Description:
-Visualize tasks as a dependency tree instead of a flat list.
+Visualizes tasks as a dependency tree instead of a flat list.
 Highlights dependencies, color-codes task status, and uses a Markdown-like
 format.
 
@@ -203,6 +201,7 @@ Repository: https://github.com/daimh/todotree
 Examples:
     cd examples
     todotree
+    todotree -R
     todotree -o Avery -o Dad
     todotree -i todotree.md
     todotree -i todotree.md lawn

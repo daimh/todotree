@@ -1,9 +1,16 @@
 use super::{Format, HTMLP, ROOT, Status, TodoError};
 use std::cell::RefCell;
 use std::cmp::{max, min};
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::rc::Rc;
+
+#[derive(PartialEq)]
+enum Location {
+    Top,
+    Mid,
+    Bottom,
+}
 
 pub struct Todo {
     pub name: String,
@@ -26,12 +33,11 @@ impl Todo {
         dependencies: Vec<String>,
         auxilaries: Vec<String>,
     ) -> Result<Self, TodoError> {
-        let status = match name.starts_with("~") {
-            true => {
-                name = name.replace("~", "");
-                Status::Completed
-            }
-            false => Status::Pending,
+        let status = if name.starts_with("~") {
+            name = name.replace("~", "");
+            Status::Completed
+        } else {
+            Status::Pending
         };
         static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
@@ -90,7 +96,16 @@ impl Todo {
         hide: bool,
         dpth_limit: i32,
         format: &Format,
-    ) -> Result<(), TodoError> {
+        owners: &mut BTreeMap<String, bool>,
+    ) -> Result<bool, TodoError> {
+        let mut own_me = if owners.len() == 0 {
+            true
+        } else if owners.contains_key(&self.owner) {
+            owners.insert(self.owner.clone(), true);
+            true
+        } else {
+            false
+        };
         let mut notdonedeps: Vec<String> = vec![];
         for dep in &self.dependencies {
             let dep = dep.replace("~", "");
@@ -119,7 +134,7 @@ impl Todo {
             }
             if dpth_limit <= 0 || dpth_limit > depth as i32 {
                 if visited.insert(child.borrow().name.clone()) {
-                    child.borrow_mut().build_tree(
+                    let own_child = child.borrow_mut().build_tree(
                         visited,
                         map,
                         maxlens,
@@ -129,13 +144,17 @@ impl Todo {
                         hide,
                         dpth_limit,
                         format,
+                        owners,
                     )?;
-                    let child_depth = child.borrow().depth;
-                    self.depth = max(child_depth + 1, self.depth);
-                    if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
-                        && (dep_notdone || !hide)
-                    {
-                        self.children.push(Rc::clone(child));
+                    if own_child {
+                        own_me = true;
+                        let child_depth = child.borrow().depth;
+                        self.depth = max(child_depth + 1, self.depth);
+                        if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
+                            && (dep_notdone || !hide)
+                        {
+                            self.children.push(Rc::clone(child));
+                        }
                     }
                 }
             }
@@ -163,7 +182,7 @@ impl Todo {
         {
             self.name.push_str(ROOT)
         }
-        Ok(())
+        Ok(own_me)
     }
 
     pub fn get_maxlens(
@@ -218,11 +237,49 @@ impl Todo {
         maxlens: &[usize; 3],
         format: &Format,
         no_color: bool,
+        reverse: bool,
     ) -> fmt::Result {
-        let space: String;
+        let space = match format {
+            Format::Md => "PANIC",
+            Format::Json => &" ".repeat(connectors.len() * 4),
+            Format::Term => " ",
+            Format::Html => "&nbsp;",
+        };
+        let (bol, eol) = match format {
+            Format::Term => ("", "\n"),
+            Format::Html => (HTMLP, "</p>\n"),
+            _ => ("", ""),
+        };
+        if (*format == Format::Html || *format == Format::Term)
+            && self.name == ROOT
+            && maxlens[1] + maxlens[2] > 0
+        {
+            self.fmt_row_separator(
+                fo,
+                connectors,
+                maxlens,
+                space,
+                bol,
+                eol,
+                reverse,
+                &Location::Top,
+            )?;
+        }
+        let children_iter = self.children.iter().enumerate();
+        if reverse {
+            for (pos, child) in children_iter.clone().rev() {
+                if visited.insert(child.borrow().name.clone()) {
+                    connectors.push(pos + 1 == self.children.len());
+                    child.borrow().fmt_tree(
+                        fo, connectors, visited, maxlens, format, no_color,
+                        reverse,
+                    )?;
+                    connectors.pop();
+                }
+            }
+        }
         match format {
             Format::Md => {
-                space = String::from("Panic");
                 if self.name != "/" {
                     write!(fo, "# ")?;
                     if self.status == Status::Completed {
@@ -249,7 +306,6 @@ impl Todo {
                 }
             }
             Format::Json => {
-                space = " ".repeat(connectors.len() * 4);
                 writeln!(fo, "{}{{", space)?;
                 writeln!(fo, "{}  \"name\": \"{}\",", space, self.name)?;
                 writeln!(fo, "{}  \"status\": \"{}\",", space, self.status)?;
@@ -266,60 +322,57 @@ impl Todo {
                 writeln!(fo, "{}  \"dependencies\": [", space)?;
             }
             Format::Term => {
-                space = String::from(" ");
-                let bol = String::new();
-                self.fmt_connector(fo, connectors, &space, &bol)?;
-                if !no_color {
+                let boc = if no_color {
+                    ""
+                } else {
                     match self.status {
-                        Status::Completed => {
-                            write!(fo, "\x1b\x5b\x33\x34\x6d")?
-                        }
-                        Status::Actionable => {
-                            write!(fo, "\x1b\x5b\x33\x31\x6d")?
-                        }
-                        Status::Pending => (),
+                        Status::Completed => "\x1b[34m", // blue foreground
+                        Status::Actionable => "\x1b[31m", // red foreground
+                        Status::Pending => "",
                     }
-                }
-                write!(fo, "{}", self.name)?;
-                if !no_color && self.status != Status::Pending {
-                    write!(fo, "\x1b\x28\x42\x1b\x5b\x6d")?;
-                }
-                let eol = String::from("\n");
-                self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
+                };
+                let eoc = if !no_color && self.status != Status::Pending {
+                    "\x1b(B\x1b[m"
+                } else {
+                    ""
+                };
+                self.fmt_table(
+                    fo, connectors, maxlens, space, bol, eol, boc, eoc, reverse,
+                )?;
             }
             Format::Html => {
-                space = String::from("&nbsp;");
-                let bol = String::from(HTMLP);
-                let eol = String::from("</p>\n");
-                self.fmt_connector(fo, connectors, &space, &bol)?;
-                if !no_color {
+                let boc = if no_color {
+                    ""
+                } else {
                     match self.status {
-                        Status::Completed => {
-                            write!(fo, "<span style='color:blue'>")?
-                        }
-                        Status::Actionable => {
-                            write!(fo, "<span style='color:red'>")?
-                        }
-                        Status::Pending => (),
+                        Status::Completed => "<span style='color:blue'>",
+                        Status::Actionable => "<span style='color:red'>",
+                        Status::Pending => "",
                     }
-                }
-                write!(fo, "{}", self.name)?;
-                if !no_color && self.status != Status::Pending {
-                    write!(fo, "</span>")?;
-                }
-                self.fmt_table(fo, connectors, maxlens, &space, &bol, &eol)?;
+                };
+                let eoc = if !no_color && self.status != Status::Pending {
+                    "</span>"
+                } else {
+                    ""
+                };
+                self.fmt_table(
+                    fo, connectors, maxlens, space, bol, eol, boc, eoc, reverse,
+                )?;
             }
         }
-        for (pos, child) in self.children.iter().enumerate() {
-            if visited.insert(child.borrow().name.clone()) {
-                connectors.push(pos + 1 == self.children.len());
-                if pos > 0 && *format == Format::Json {
-                    writeln!(fo, "{}    ,", space)?;
+        if !reverse {
+            for (pos, child) in children_iter {
+                if visited.insert(child.borrow().name.clone()) {
+                    connectors.push(pos + 1 == self.children.len());
+                    if pos > 0 && *format == Format::Json {
+                        writeln!(fo, "{}    ,", space)?;
+                    }
+                    child.borrow().fmt_tree(
+                        fo, connectors, visited, maxlens, format, no_color,
+                        reverse,
+                    )?;
+                    connectors.pop();
                 }
-                child.borrow().fmt_tree(
-                    fo, connectors, visited, maxlens, format, no_color,
-                )?;
-                connectors.pop();
             }
         }
         if *format == Format::Json {
@@ -333,14 +386,19 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
-        space: &String,
-        bol: &String,
+        space: &str,
+        bol: &str,
+        boc: &str,
+        eoc: &str,
+        reverse: bool,
     ) -> fmt::Result {
         write!(fo, "{}", bol)?;
         for (pos, cn) in connectors.iter().enumerate() {
             if *cn {
                 if pos + 1 < connectors.len() {
                     write!(fo, "{}", space.repeat(4))?;
+                } else if reverse {
+                    write!(fo, "┌──{}", space)?;
                 } else {
                     write!(fo, "└──{}", space)?;
                 }
@@ -350,7 +408,7 @@ impl Todo {
                 write!(fo, "├──{}", space)?;
             }
         }
-        Ok(())
+        write!(fo, "{}{}{}", boc, self.name, eoc)
     }
 
     fn fmt_table(
@@ -358,103 +416,151 @@ impl Todo {
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
         maxlens: &[usize; 3],
-        space: &String,
-        bol: &String,
-        eol: &String,
+        space: &str,
+        bol: &str,
+        eol: &str,
+        boc: &str,
+        eoc: &str,
+        reverse: bool,
     ) -> fmt::Result {
         if maxlens[1] + maxlens[2] == 0 {
-            write!(fo, "{}", eol)?;
-        } else {
-            write!(
-                fo,
-                "{}",
-                space.repeat(
-                    maxlens[0] - connectors.len() * 4 - self.name.len()
-                )
-            )?;
-            write!(fo, "{}│{}", space, space)?;
-            if maxlens[1] > 0 {
-                write!(
-                    fo,
-                    "{}{}│",
-                    self.owner,
-                    space.repeat(1 + maxlens[1] - self.owner.len())
-                )?;
-                if maxlens[2] > 0 {
-                    write!(fo, "{}", space)?;
-                }
-            }
-            if maxlens[2] > 0 {
-                self.fmt_comment(fo, connectors, maxlens, space, bol, eol)?;
-            } else {
-                write!(fo, "{}", eol)?;
-                self.fmt_cont_comment_or_dash(
-                    fo, connectors, maxlens, &space, &bol, false,
-                )?;
-            }
-            write!(fo, "{}", eol)?;
+            self.fmt_connector(fo, connectors, space, bol, boc, eoc, reverse)?;
+            return write!(fo, "{}", eol);
         }
-        Ok(())
-    }
-
-    fn fmt_cont_comment_or_dash(
-        &self,
-        fo: &mut fmt::Formatter<'_>,
-        connectors: &Vec<bool>,
-        maxlens: &[usize; 3],
-        space: &String,
-        bol: &String,
-        iscomment: bool,
-    ) -> fmt::Result {
-        write!(fo, "{}", bol)?;
-        for b in connectors {
-            match *b {
-                true => write!(fo, "{}", space)?,
-                false => write!(fo, "│")?,
-            };
-            write!(fo, "{}", space.repeat(3))?;
-        }
-        match self.children.len() {
-            0 => write!(fo, "{}", space),
-            _ => write!(fo, "│"),
-        }?;
+        self.fmt_connector(fo, connectors, space, bol, boc, eoc, reverse)?;
         write!(
             fo,
             "{}",
-            space.repeat(maxlens[0] - 1 - connectors.len() * 4)
+            space.repeat(maxlens[0] - connectors.len() * 4 - self.name.len())
         )?;
-        if iscomment {
-            write!(fo, "{}│{}", space, space)?;
-            write!(fo, "{}", space.repeat(maxlens[1]))?;
-            if maxlens[1] > 0 && maxlens[2] > 0 {
-                write!(fo, "{}│{}", space, space)?;
+        write!(fo, "{}│{}", space, space)?;
+        if maxlens[1] > 0 {
+            write!(
+                fo,
+                "{}{}│",
+                self.owner,
+                space.repeat(1 + maxlens[1] - self.owner.len())
+            )?;
+            if maxlens[2] > 0 {
+                write!(fo, "{}", space)?;
+            }
+        }
+        let location = if reverse {
+            if self.name == ROOT {
+                Location::Bottom
+            } else {
+                Location::Mid
             }
         } else {
             let mut last = self.children.len() == 0;
             if last {
-                for b in connectors {
-                    last = *b;
+                for b in connectors.iter() {
+                    last = last && *b;
                     if !last {
                         break;
                     }
                 }
             }
-            match last {
-                false => write!(fo, "{}├─", space),
-                true => write!(fo, "{}└─", space),
-            }?;
-            write!(fo, "{}", "─".repeat(maxlens[1]))?;
-            if maxlens[1] > 0 && maxlens[2] > 0 {
-                match last {
-                    false => write!(fo, "─┼─"),
-                    true => write!(fo, "─┴─"),
-                }?;
+            if last {
+                Location::Bottom
+            } else {
+                Location::Mid
             }
-            write!(fo, "{}", "─".repeat(maxlens[2]))?;
-            match last {
-                false => write!(fo, "─┤"),
-                true => write!(fo, "─┘"),
-            }?;
+        };
+        match maxlens[2] {
+            0 => write!(fo, "{}", eol)?,
+            _ => self.fmt_comment(
+                fo, connectors, maxlens, space, bol, eol, reverse, &location,
+            )?,
+        }
+        self.fmt_row_separator(
+            fo, connectors, maxlens, space, bol, eol, reverse, &location,
+        )
+    }
+
+    fn fmt_space_before_table(
+        &self,
+        fo: &mut fmt::Formatter<'_>,
+        connectors: &Vec<bool>,
+        maxlens: &[usize; 3],
+        space: &str,
+        bol: &str,
+        reverse: bool,
+        location: &Location,
+    ) -> fmt::Result {
+        write!(fo, "{}", bol)?;
+        for (i, b) in connectors.iter().enumerate() {
+            if reverse && i + 1 == connectors.len() {
+                break;
+            }
+            if *b {
+                write!(fo, "{}", space)?;
+            } else {
+                write!(fo, "│")?;
+            }
+            write!(fo, "{}", space.repeat(3))?;
+        }
+        if reverse {
+            if connectors.len() > 0 {
+                write!(fo, "│{}", space.repeat(4))?
+            } else {
+                write!(fo, "{}", space)?
+            }
+        } else if self.children.len() == 0 || *location == Location::Top {
+            write!(fo, "{}", space)?;
+        } else {
+            write!(fo, "│")?;
+        }
+        write!(
+            fo,
+            "{}",
+            space.repeat(maxlens[0] - 1 - connectors.len() * 4)
+        )
+    }
+
+    fn fmt_row_separator(
+        &self,
+        fo: &mut fmt::Formatter<'_>,
+        connectors: &Vec<bool>,
+        maxlens: &[usize; 3],
+        space: &str,
+        bol: &str,
+        eol: &str,
+        reverse: bool,
+        location: &Location,
+    ) -> fmt::Result {
+        self.fmt_space_before_table(
+            fo, connectors, maxlens, space, bol, reverse, location,
+        )?;
+        let (cl, cm, cr) = match location {
+            Location::Top => ("┌", "┬", "┐"),
+            Location::Mid => ("├", "┼", "┤"),
+            Location::Bottom => ("└", "┴", "┘"),
+        };
+        write!(fo, "{}{}─{}", space, cl, "─".repeat(maxlens[1]))?;
+        if maxlens[1] > 0 && maxlens[2] > 0 {
+            write!(fo, "─{}─", cm)?;
+        }
+        write!(fo, "{}─{}{}", "─".repeat(maxlens[2]), cr, eol)
+    }
+
+    fn fmt_cont_comment(
+        &self,
+        fo: &mut fmt::Formatter<'_>,
+        connectors: &Vec<bool>,
+        maxlens: &[usize; 3],
+        space: &str,
+        bol: &str,
+        reverse: bool,
+        location: &Location,
+    ) -> fmt::Result {
+        self.fmt_space_before_table(
+            fo, connectors, maxlens, space, bol, reverse, location,
+        )?;
+        write!(fo, "{}│{}", space, space)?;
+        write!(fo, "{}", space.repeat(maxlens[1]))?;
+        if maxlens[1] > 0 && maxlens[2] > 0 {
+            write!(fo, "{}│{}", space, space)?;
         }
         Ok(())
     }
@@ -464,9 +570,11 @@ impl Todo {
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
         maxlens: &[usize; 3],
-        space: &String,
-        bol: &String,
-        eol: &String,
+        space: &str,
+        bol: &str,
+        eol: &str,
+        reverse: bool,
+        location: &Location,
     ) -> fmt::Result {
         let comt = match self.comment.len() {
             0 => &vec![String::new(); 1],
@@ -480,8 +588,8 @@ impl Todo {
         let cmt_width = maxlens[2] - seq_width;
         for (idx, line) in comt.iter().enumerate() {
             if idx > 0 {
-                self.fmt_cont_comment_or_dash(
-                    fo, connectors, maxlens, space, bol, true,
+                self.fmt_cont_comment(
+                    fo, connectors, maxlens, space, bol, reverse, location,
                 )?;
             }
             let mut start = 0;
@@ -496,17 +604,15 @@ impl Todo {
                 write!(fo, "{}", &line[start..start + slen])?;
                 write!(fo, "{}", space.repeat(cmt_width - slen))?;
                 write!(fo, "{}│{}", space, eol)?;
-                start = start + slen;
+                start += slen;
                 if start >= line.len() {
                     break;
                 }
-                self.fmt_cont_comment_or_dash(
-                    fo, connectors, maxlens, space, bol, true,
+                self.fmt_cont_comment(
+                    fo, connectors, maxlens, space, bol, reverse, location,
                 )?;
             }
         }
-        self.fmt_cont_comment_or_dash(
-            fo, connectors, maxlens, space, bol, false,
-        )
+        Ok(())
     }
 }
