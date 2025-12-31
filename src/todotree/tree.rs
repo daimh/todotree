@@ -72,18 +72,16 @@ impl Tree {
             "md" => Format::Md,
             "" => Format::Term,
             _ => {
-                return Err(TodoError {
-                    msg: String::from("ERR-006: Wrong parameter for -f"),
-                });
+                return Err(TodoError::Input(String::from(
+                    "ERR-006: Wrong parameter for -f",
+                )));
             }
         };
         if reverse && format_enum != Format::Term && format_enum != Format::Html
         {
-            return Err(TodoError {
-                msg: String::from(
-                    "ERR-024: --reverse works with Term or Html only",
-                ),
-            });
+            return Err(TodoError::Input(String::from(
+                "ERR-024: '--reverse' works with Term or Html only",
+            )));
         }
         let mut screen_width: usize = 80;
         if format_enum == Format::Term && term_width == 0 {
@@ -122,11 +120,9 @@ impl Tree {
         }
         // check dict
         if tree.dict.len() == 0 {
-            return Err(TodoError {
-                msg: String::from(
-                    "ERR-010: The markdown file does not have any Todo",
-                ),
-            });
+            return Err(TodoError::Input(String::from(
+                "ERR-010: The markdown file does not have any TODO",
+            )));
         }
         // add all TODOs that have no parent to ROOT's dependencies
         if tree.root.borrow().dependencies.len() == 0 {
@@ -138,12 +134,10 @@ impl Tree {
                     noparent.remove(&dep);
                 }
                 if noparent.len() == 0 {
-                    return Err(TodoError {
-                        msg: String::from(
-                            "ERR-007: Failed to find root node, as all todos \
+                    return Err(TodoError::Input(String::from(
+                        "ERR-007: Failed to find root node, as all todos \
                              are in dependency loops",
-                        ),
-                    });
+                    )));
                 }
             }
             for nm in tree.dict.keys() {
@@ -169,12 +163,10 @@ impl Tree {
         )?;
         for (owner, used) in owners.iter() {
             if !*used {
-                return Err(TodoError {
-                    msg: format!(
-                        "ERR-022: no such owner '{}' in the markdown file",
-                        owner
-                    ),
-                });
+                return Err(TodoError::Input(format!(
+                    "ERR-022: No such owner '{}' in the markdown file",
+                    owner
+                )));
             }
         }
         Ok(tree)
@@ -222,14 +214,7 @@ impl Tree {
         let mut comment: Vec<String> = Vec::new();
         let mut dependencies: Vec<String> = Vec::new();
         let mut auxilaries: Vec<String> = Vec::new();
-        let buffer = match read_to_string(mdfile) {
-            Ok(md) => self.escape(&md),
-            Err(e) => {
-                return Err(TodoError {
-                    msg: format!("ERR-008: '{}', {}.", mdfile, e),
-                });
-            }
-        };
+        let buffer = self.escape(&read_to_string(mdfile)?);
         for ln in buffer.lines() {
             let ln = ln.trim();
             if ln.starts_with("# ") {
@@ -240,21 +225,14 @@ impl Tree {
                     dependencies,
                     auxilaries,
                 )?;
-                name = match ln.get(2..) {
-                    Some(x) => x.trim().to_string(),
-                    _ => {
-                        return Err(TodoError {
-                            msg: format!("ERR-015: '{}'", ln),
-                        });
-                    }
-                };
+                name = ln.get(2..).map(|x| x.trim().to_string()).ok_or_else(
+                    || TodoError::Input(format!("ERR-015: TODO name '{}'", ln)),
+                )?;
                 if name == "" || name == ROOT {
-                    return Err(TodoError {
-                        msg: format!(
-                            "ERR-009: '{}' is a reserved Todo name keyword",
-                            ROOT
-                        ),
-                    });
+                    return Err(TodoError::Input(format!(
+                        "ERR-009: '{}' is a reserved TODO name keyword",
+                        ROOT
+                    )));
                 }
                 owner = String::new();
                 comment = Vec::new();
@@ -284,12 +262,10 @@ impl Tree {
                 for dep in dependencies.iter() {
                     let dep = dep.replace("~", "");
                     if dep == name {
-                        return Err(TodoError {
-                            msg: format!(
-                                "ERR-016: Todo '{}' should not depend on itself",
-                                dep
-                            ),
-                        });
+                        return Err(TodoError::Input(format!(
+                            "ERR-016: TODO '{}' should not depend on itself",
+                            dep
+                        )));
                     }
                 }
             } else {
@@ -315,14 +291,12 @@ impl Tree {
                 let cur_completed = dep_raw.contains("~");
                 if self.dict.contains_key(&dep_nom) {
                     if cur_completed {
-                        return Err(TodoError {
-                            msg: format!(
-                                "ERR-011: Todo '{}' has its own '# ' line, \
+                        return Err(TodoError::Input(format!(
+                            "ERR-011: TODO '{}' has its own '# ' line, \
                                  then it should not have '~' in '{}'s \
                                  dependencies list.",
-                                dep_nom, key
-                            ),
-                        });
+                            dep_nom, key
+                        )));
                     }
                     continue;
                 }
@@ -331,14 +305,12 @@ impl Tree {
                         let prv_completed =
                             parent_todo.1.status == Status::Completed;
                         if prv_completed != cur_completed {
-                            return Err(TodoError {
-                                msg: format!(
-                                    "ERR-012: Todo '{}' has a dependency \
+                            return Err(TodoError::Input(format!(
+                                "ERR-012: TODO '{}' has a dependency \
                                      '~{}', but todo '{}' has a dependency \
                                      '{}'.",
-                                    key, dep_nom, parent_todo.0, dep_nom
-                                ),
-                            });
+                                key, dep_nom, parent_todo.0, dep_nom
+                            )));
                         }
                     }
                     None => {
@@ -383,12 +355,10 @@ impl Tree {
             if owner == "" && comment.len() == 0 && dependencies.len() == 0 {
                 return Ok(());
             } else {
-                return Err(TodoError {
-                    msg: String::from(
-                        "ERR-013: Missing '# [TODO]' before '- @', '- :', \
+                return Err(TodoError::Input(String::from(
+                    "ERR-013: Missing '# [TODO]' before '- @', '- :', \
                          or '-  %' in the todotree markdown file.",
-                    ),
-                });
+                )));
             }
         }
         let comt: Vec<String> = match self.separator.as_str() {
@@ -404,9 +374,10 @@ impl Tree {
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))
             .is_some()
         {
-            return Err(TodoError {
-                msg: format!("ERR-014: Duplicated todo name '{}'", nm),
-            });
+            return Err(TodoError::Input(format!(
+                "ERR-014: Duplicated todo name '{}'",
+                nm
+            )));
         }
         Ok(())
     }

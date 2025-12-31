@@ -1,5 +1,7 @@
-use std::error::Error;
+use getopts::Fail;
 use std::fmt;
+use std::io;
+use std::num::ParseIntError;
 mod todo;
 pub mod tree;
 static ROOT: &str = "/";
@@ -35,12 +37,30 @@ impl fmt::Display for Status {
 }
 
 #[derive(Debug)]
-pub struct TodoError {
-    pub msg: String,
+pub enum TodoError {
+    Io(io::Error),
+    Input(String),
 }
-impl Error for TodoError {}
 impl fmt::Display for TodoError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.msg)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TodoError::Io(e) => write!(f, "I/O error: {}", e),
+            TodoError::Input(msg) => write!(f, "{}", msg),
+        }
+    }
+}
+impl From<Fail> for TodoError {
+    fn from(err: Fail) -> Self {
+        TodoError::Input(err.to_string())
+    }
+}
+impl From<io::Error> for TodoError {
+    fn from(err: io::Error) -> Self {
+        TodoError::Io(err)
+    }
+}
+impl From<ParseIntError> for TodoError {
+    fn from(err: ParseIntError) -> Self {
+        TodoError::Input(err.to_string())
     }
 }

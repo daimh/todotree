@@ -88,6 +88,7 @@ todotree -o md -i no-owner.md > no-owner-new.md
 - help
 ```
 todotree -h
+todotree --sample
 ```
 
 - compile statically linked exectuable

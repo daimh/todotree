@@ -45,12 +45,10 @@ impl Todo {
         ];
         if name != ROOT {
             if name.ends_with(ROOT) {
-                return Err(TodoError {
-                    msg: format!(
-                        "ERR-018: Todo name '{}' should not end with '/'",
-                        name
-                    ),
-                });
+                return Err(TodoError::Input(format!(
+                    "ERR-018: TODO name '{}' should not end with '/'",
+                    name
+                )));
             }
             for c in name.chars() {
                 if !SPECIALS.contains(&c)
@@ -58,14 +56,12 @@ impl Todo {
                     && (c < 'A' || c > 'Z')
                     && (c < '0' || c > '9')
                 {
-                    return Err(TodoError {
-                        msg: format!(
-                            "ERR-001: Todo name '{}' contains unsupported \
+                    return Err(TodoError::Input(format!(
+                        "ERR-001: TODO name '{}' contains unsupported \
                             character '{}', which is not alphabet, digit, \
                             or {:?}",
-                            name, c, SPECIALS
-                        ),
-                    });
+                        name, c, SPECIALS
+                    )));
                 }
             }
         }
@@ -110,22 +106,18 @@ impl Todo {
         for dep in &self.dependencies {
             let dep = dep.replace("~", "");
             if !path.insert(dep.clone()) {
-                return Err(TodoError {
-                    msg: format!(
-                        "ERR-002: Todos '{:?}' has a dependency loop",
-                        path
-                    ),
-                });
+                return Err(TodoError::Input(format!(
+                    "ERR-002: TODOs '{:?}' has a dependency loop",
+                    path
+                )));
             }
             let child = match map.get(&dep) {
                 Some(m) => m,
                 None => {
-                    return Err(TodoError {
-                        msg: format!(
-                            "ERR-003: Todo '{}' is missing in the markdown file",
-                            &dep
-                        ),
-                    });
+                    return Err(TodoError::Input(format!(
+                        "ERR-003: TODO '{}' is missing in the markdown file",
+                        &dep
+                    )));
                 }
             };
             let dep_notdone = child.borrow().status != Status::Completed;
@@ -165,13 +157,11 @@ impl Todo {
                 self.status = Status::Actionable;
             }
         } else if self.status == Status::Completed {
-            return Err(TodoError {
-                msg: format!(
-                    "ERR-004: Todo \"{}\" cannot be completed \
+            return Err(TodoError::Input(format!(
+                "ERR-004: TODO \"{}\" cannot be completed \
                     because its dependencies {:?} are not completed yet",
-                    self.name, notdonedeps
-                ),
-            });
+                self.name, notdonedeps
+            )));
         }
         if self.name == ROOT {
             self.get_maxlens(maxlens, 0, screen_width)?;
@@ -214,14 +204,12 @@ impl Todo {
         }
         if self.name == ROOT {
             if screen_width <= maxlens[0] + maxlens[1] + 8 {
-                return Err(TodoError {
-                    msg: format!(
-                        "ERR-005: Screen width is {}, but this todotree \
+                return Err(TodoError::Input(format!(
+                    "ERR-005: Screen width is {}, but this todotree \
                         needs at least {} columns",
-                        screen_width,
-                        maxlens[0] + maxlens[1] + 9
-                    ),
-                });
+                    screen_width,
+                    maxlens[0] + maxlens[1] + 9
+                )));
             }
             maxlens[2] =
                 min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);

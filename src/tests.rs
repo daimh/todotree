@@ -50,7 +50,9 @@ fn examples() {
                     + format;
                 let standard = match read_to_string(&basefile) {
                     Ok(s) => s,
-                    Err(e) => panic!("ERR-903: '{}', {}", basefile, e),
+                    Err(e) => {
+                        panic!("ERR-903: md: {}, {}", basefile, e)
+                    }
                 };
                 assert!(
                     standard == output,
@@ -69,11 +71,11 @@ fn examples() {
 fn errors() {
     for path in read_dir("src/tests/").unwrap() {
         let md = path.unwrap().path().display().to_string();
-        if !md.ends_with(".md") || !md.starts_with("src/tests/ERR-") {
+        if !md.ends_with(".md") || !md.starts_with("src/tests/ERR") {
             continue;
         }
         if md.len() < 20 {
-            panic!("ERR-906: {}", md);
+            panic!("ERR-906: md: {}", md);
         }
         let inputs = vec![md.clone()];
         let options = md[17..].replace(".md", "");
@@ -104,9 +106,11 @@ fn errors() {
             false,
             false,
         ) {
-            Err(e) => assert!(e.msg.starts_with(&md[10..17]), "{}, {}", md, e),
+            Err(e) => {
+                assert!(e.to_string().starts_with(&md[10..17]), "{}, {}", md, e)
+            }
             _ => {
-                panic!("ERR-905: {}", md);
+                panic!("ERR-905: md: {}", md);
             }
         }
     }

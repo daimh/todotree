@@ -1,15 +1,15 @@
 use getopts::{Matches, Options};
 use std::collections::BTreeMap;
 use std::env;
+use std::fs::OpenOptions;
 use std::io::{self, ErrorKind, Write};
-use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 mod todotree;
 use inotify::{Inotify, WatchMask};
-use todotree::tree::Tree;
+use todotree::{TodoError, tree::Tree};
 
-fn main() -> ExitCode {
+fn main() -> Result<(), TodoError> {
     let args: Vec<String> = env::args().collect();
     let mut opts = Options::new();
     opts.optflag(
@@ -18,6 +18,11 @@ fn main() -> ExitCode {
         "Auto-add missing TODO definitions from dependencies.",
     );
     opts.optflag("C", "no-color", "Disable color output.");
+    opts.optflag(
+        "E",
+        "example",
+        "Create a sample todotree.md in the current directory.",
+    );
     opts.optflag("M", "hide-comment", "Hide comment column.");
     opts.optflag("O", "hide-owner", "Hide owner column.");
     opts.optflag("R", "reverse", "Reverse the tree order.");
@@ -31,7 +36,7 @@ fn main() -> ExitCode {
         "i",
         "input",
         "Read TODOs from FILE (default:  'todotree.md'). \
-			May be specified multiple times.",
+                        May be specified multiple times.",
         "FILE",
     );
     opts.optopt(
@@ -56,20 +61,32 @@ fn main() -> ExitCode {
     );
     opts.optflag("h", "help", "Show this help and exit.");
     opts.optflag("", "version", "Show version information and exit.");
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => m,
-        Err(f) => {
-            eprintln!("ERR-023: {}", f.to_string());
-            return ExitCode::FAILURE;
-        }
-    };
+    let matches = opts.parse(&args[1..])?;
     if matches.opt_present("version") {
-        print_version();
-        return ExitCode::SUCCESS;
+        return print_version();
     }
     if matches.opt_present("help") {
-        print_usage(&opts);
-        return ExitCode::SUCCESS;
+        return print_usage(&opts);
+    }
+    if matches.opt_present("example") {
+        let path = "todotree.md"; // file path
+        let content = "\
+# lawn
+- @ Avery
+- : mower
+- % at noon
+- % mow the lawn
+
+# ~mower
+- @ Brody
+- % test the mower";
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true) // <-- fail if the file exists
+            .open(path)?;
+        file.write_all(content.as_bytes())?;
+        println!("Created todotree.md");
+        return Ok(());
     }
     let mut inputs = matches.opt_strs("input");
     if inputs.len() == 0 {
@@ -82,42 +99,42 @@ fn main() -> ExitCode {
         .collect::<BTreeMap<String, bool>>();
     let free = &matches.free;
     let targets = if free.is_empty() { &vec![] } else { free };
-    if !print_tree(&matches, &inputs, &mut owners, targets) {
-        return ExitCode::FAILURE;
-    }
+    print_tree(&matches, &inputs, &mut owners, targets)?;
     if matches.opt_present("refresh") {
         match matches.opt_str("format") {
             Some(x) => {
                 if x != "term" {
-                    return ExitCode::SUCCESS;
+                    return Ok(());
                 }
             }
             None => (),
         };
         loop {
-            let mut inotify = Inotify::init().expect("ERR-017: inotify init");
+            let mut inotify = Inotify::init()?;
             for mdfile in &inputs {
                 if let Err(e) = inotify
                     .watches()
                     .add(&mdfile, WatchMask::MODIFY | WatchMask::CLOSE)
                 {
-                    match e.kind() {
-                        ErrorKind::NotFound => {
-                            thread::sleep(Duration::from_secs(1));
-                            continue;
-                        }
-                        _ => panic!("ERR-019: inotify watch, {}", e),
+                    if e.kind() == ErrorKind::NotFound {
+                        thread::sleep(Duration::from_secs(1));
+                    } else {
+                        return Err(TodoError::Input(format!(
+                            "ERR-019: Inotify, {}",
+                            e
+                        )));
                     }
                 }
             }
             let mut buffer = [0u8; 4096];
-            inotify
-                .read_events_blocking(&mut buffer)
-                .expect("ERR-020: reading events");
-            print_tree(&matches, &inputs, &mut owners, targets);
+            inotify.read_events_blocking(&mut buffer)?;
+            if let Err(e) = print_tree(&matches, &inputs, &mut owners, targets)
+            {
+                println!("{}", e);
+            }
         }
     }
-    ExitCode::SUCCESS
+    Ok(())
 }
 
 fn print_tree(
@@ -125,30 +142,24 @@ fn print_tree(
     inputs: &Vec<String>,
     owners: &mut BTreeMap<String, bool>,
     targets: &[String],
-) -> bool {
+) -> Result<(), TodoError> {
     if matches.opt_present("refresh") {
         print!("\x1B[2J\x1B[1;1H");
-        io::stdout().flush().expect("ERR-021: refresh console");
+        io::stdout().flush()?;
     }
     let format = match matches.opt_str("format") {
         Some(x) => x,
         None => String::new(),
     };
     let depth: i32 = match matches.opt_str("depth") {
-        Some(x) => match x.parse() {
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("{}", e.to_string());
-                return false;
-            }
-        },
+        Some(x) => x.parse()?,
         None => 0,
     };
     let separator = match matches.opt_str("separator") {
         Some(x) => x,
         None => String::from("\n"),
     };
-    match Tree::new(
+    let tree = Tree::new(
         inputs,
         owners,
         targets,
@@ -162,19 +173,12 @@ fn print_tree(
         matches.opt_present("hide-comment"),
         matches.opt_present("hide-owner"),
         matches.opt_present("reverse"),
-    ) {
-        Ok(tree) => {
-            print!("{}", tree);
-            return true;
-        }
-        Err(e) => {
-            eprintln!("{}", e);
-            return false;
-        }
-    }
+    )?;
+    print!("{}", tree);
+    Ok(())
 }
 
-fn print_version() {
+fn print_version() -> Result<(), TodoError> {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     const LICENSE: &str = env!("CARGO_PKG_LICENSE");
     const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
@@ -182,9 +186,10 @@ fn print_version() {
         "todotree {}, {} License, Copyright (c) {}",
         VERSION, LICENSE, AUTHOR
     );
+    Ok(())
 }
 
-fn print_usage(opts: &Options) {
+fn print_usage(opts: &Options) -> Result<(), TodoError> {
     print!(
         "{}",
         opts.usage(
@@ -193,12 +198,13 @@ Usage: todotree [options] [TODO]...
 
 Description:
 Visualizes tasks as a dependency tree instead of a flat list.
-Highlights dependencies, color-codes task status, and uses a Markdown-like
-format.
+Highlights dependencies, color-codes task status, and uses a Markdown
+format as input.
 
 Repository: https://github.com/daimh/todotree
 
 Examples:
+    todotree -E; ls -l todotree.md
     cd examples
     todotree
     todotree -R
@@ -209,6 +215,7 @@ Examples:
 "
         )
     );
+    Ok(())
 }
 
 #[cfg(test)]
