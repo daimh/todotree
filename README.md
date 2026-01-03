@@ -2,6 +2,8 @@
 
 Todotree visualize tasks as a dependency tree rather than a flat list, highlighting complex relationships and color-coding their statuses. Inspired by the structure of Makefiles and the readability of Markdown.
 
+[Watch the demo on YouTube](https://github.com/user-attachments/assets/6590eba5-d053-4c93-9675-724348108536)
+
 - **Dependency Tree**: Todos are displayed in a tree format, showing dependencies between tasks.
 - **Actionable Todos**: Tasks that are actionable are highlighted in **red**, making them easy to spot.
 - **Pending Todos**: Tasks that are not actionable yet.
@@ -9,6 +11,7 @@ Todotree visualize tasks as a dependency tree rather than a flat list, highlight
 - **Multiple Output Formats**: Supports output in terminal, html, json and markdown formats.
 
 Todotree automatically categorizes your tasks as **Pending** or **Actionable** (red) unless they're marked as **Completed** (using `~` or enclosed in `~~`).
+
 
 ## Example 
 #### Input 
@@ -18,6 +21,7 @@ Todotree automatically categorizes your tasks as **Pending** or **Actionable** (
 - Terminal
 ![terminal](examples/todotree.png "Title")
 - [html](https://htmlpreview.github.io/?https://raw.githubusercontent.com/daimh/todotree/refs/heads/master/examples/output/todotree.html)
+- [md](examples/output/todotree.md)
 - [json](examples/output/todotree.json)
 
 
@@ -88,7 +92,6 @@ todotree -o md -i no-owner.md > no-owner-new.md
 - help
 ```
 todotree -h
-todotree --sample
 ```
 
 - compile statically linked exectuable
@@ -100,13 +103,13 @@ RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
 
 Each to-do item in the input markdown file is defined by four special lines:
 
-1. **`## <todo-name>`**: The task name, consisting of alphabets, digits, and some special characters. Completed tasks will be displayed in **blue** in both the output HTML file and terminal. To mark a task as completed, prefix it with `~` or enclose it in `~~`, which will also apply a strikethrough style in the markdown file.
+1. **`# <todo-name>`**: The task name, consisting of alphabets, digits, and some special characters. Completed tasks will be displayed in **blue** in both the output HTML file and terminal. To mark a task as completed, prefix it with `~` or enclose it in `~~`, which will also apply a strikethrough style in the markdown file.
    
-2. **`- @<owner>`**: The optional owner of the to-do. This field allows you to assign responsibility to a specific person or team.
+2. **`- @ <owner>`**: The optional owner of the to-do. This field allows you to assign responsibility to a specific person or team.
    
-3. **`- :<dependencies>`**: An optional list of dependencies for the to-do, which can span multiple lines for easier editing. This allows you to track tasks that must be completed before others.
+3. **`- : <dependencies>`**: An optional list of dependencies for the to-do, which can span multiple lines for easier editing. This allows you to track tasks that must be completed before others.
    
-4. **`- %<comment>`**: An optional comment or note related to the to-do, providing additional context or details. It can span multiple lines too
+4. **`- % <comment>`**: An optional comment or note related to the to-do, providing additional context or details. It can span multiple lines too
 
 
 ## License

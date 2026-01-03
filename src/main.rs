@@ -79,7 +79,8 @@ fn main() -> Result<(), TodoError> {
 
 # ~mower
 - @ Brody
-- % test the mower";
+- % test the mower
+";
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true) // <-- fail if the file exists
