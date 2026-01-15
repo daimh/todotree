@@ -89,7 +89,8 @@ impl Todo {
         path: &mut BTreeSet<String>,
         depth: usize,
         screen_width: usize,
-        hide: bool,
+        hide_done: bool,
+        hide_owner: bool,
         dpth_limit: i32,
         format: &Format,
         owners: &mut BTreeMap<String, bool>,
@@ -102,6 +103,9 @@ impl Todo {
         } else {
             false
         };
+        if hide_owner {
+            self.owner = String::new();
+        }
         let mut notdonedeps: Vec<String> = vec![];
         for dep in &self.dependencies {
             let dep = dep.replace("~", "");
@@ -133,7 +137,8 @@ impl Todo {
                         path,
                         depth + 1,
                         screen_width,
-                        hide,
+                        hide_done,
+                        hide_owner,
                         dpth_limit,
                         format,
                         owners,
@@ -143,7 +148,7 @@ impl Todo {
                         let child_depth = child.borrow().depth;
                         self.depth = max(child_depth + 1, self.depth);
                         if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
-                            && (dep_notdone || !hide)
+                            && (dep_notdone || !hide_done)
                         {
                             self.children.push(Rc::clone(child));
                         }
@@ -188,10 +193,10 @@ impl Todo {
         }
         if self.name == ROOT {
             if maxlens[1] > 0 {
-                self.owner = String::from("OWNER")
+                self.owner = "OWNER".to_string()
             }
             if maxlens[2] > 0 {
-                self.comment = vec![String::from("COMMENT"); 1];
+                self.comment = vec!["COMMENT".to_string(); 1];
             }
         }
         maxlens[0] = max(maxlens[0], depth * 4 + self.name.len());

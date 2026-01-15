@@ -72,16 +72,16 @@ impl Tree {
             "md" => Format::Md,
             "" => Format::Term,
             _ => {
-                return Err(TodoError::Input(String::from(
-                    "ERR-006: Wrong parameter for -f",
-                )));
+                return Err(TodoError::Input(
+                    "ERR-006: Wrong parameter for -f".to_string(),
+                ));
             }
         };
         if reverse && format_enum != Format::Term && format_enum != Format::Html
         {
-            return Err(TodoError::Input(String::from(
-                "ERR-024: '--reverse' works with Term or Html only",
-            )));
+            return Err(TodoError::Input(
+                "ERR-024: '--reverse' works with Term or Html only".to_string(),
+            ));
         }
         let mut screen_width: usize = 80;
         if format_enum == Format::Term && term_width == 0 {
@@ -101,7 +101,7 @@ impl Tree {
         };
         let mut tree = Tree {
             root: Rc::new(RefCell::new(Todo::new(
-                String::from(ROOT),
+                ROOT.to_string(),
                 String::new(),
                 Vec::new(),
                 targets.to_vec(),
@@ -110,19 +110,19 @@ impl Tree {
             format: format_enum.clone(),
             maxlens: [0; 3],
             dict: BTreeMap::new(),
-            separator: String::from(separator),
+            separator: separator.to_string(),
             auxilaries: Vec::new(),
             no_color: no_color,
             reverse: reverse,
         };
         for mdfile in inputs {
-            tree.readmd(mdfile, hide_comment, hide_owner)?;
+            tree.readmd(mdfile, hide_comment)?;
         }
         // check dict
         if tree.dict.len() == 0 {
-            return Err(TodoError::Input(String::from(
-                "ERR-010: The markdown file does not have any TODO",
-            )));
+            return Err(TodoError::Input(
+                "ERR-010: The markdown file does not have any TODO".to_string(),
+            ));
         }
         // add all TODOs that have no parent to ROOT's dependencies
         if tree.root.borrow().dependencies.len() == 0 {
@@ -134,10 +134,11 @@ impl Tree {
                     noparent.remove(&dep);
                 }
                 if noparent.len() == 0 {
-                    return Err(TodoError::Input(String::from(
+                    return Err(TodoError::Input(
                         "ERR-007: Failed to find root node, as all todos \
-                             are in dependency loops",
-                    )));
+                             are in dependency loops"
+                            .to_string(),
+                    ));
                 }
             }
             for nm in tree.dict.keys() {
@@ -157,6 +158,7 @@ impl Tree {
             0,
             screen_width,
             hide_done,
+            hide_owner,
             dpth_limit,
             &format_enum,
             owners,
@@ -178,7 +180,7 @@ impl Tree {
             '\\', '`', '*', '_', '{', '}', '[', ']', '(', ')', '#', '+', '-',
             '.', '!',
         ];
-        let mut escaped = String::from("");
+        let mut escaped = String::new();
         let mut prev_is_slash = false;
         for mut c in input.chars() {
             if c == '\t' {
@@ -207,7 +209,6 @@ impl Tree {
         &mut self,
         mdfile: &str,
         hide_comment: bool,
-        hide_owner: bool,
     ) -> Result<(), TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
@@ -239,12 +240,13 @@ impl Tree {
                 dependencies = Vec::new();
                 auxilaries = Vec::new();
             } else if ln.starts_with("- @") {
-                if !hide_owner {
-                    if owner.len() > 0 {
-                        owner.push_str(" ");
-                    }
-                    owner.push_str(ln.get(3..).unwrap().trim())
+                if owner.len() > 0 {
+                    return Err(TodoError::Input(
+                        "ERR-008: Owner cannot be specified multiple times"
+                            .to_string(),
+                    ));
                 }
+                owner.push_str(ln.get(3..).unwrap().trim())
             } else if ln.starts_with("- %") {
                 if !hide_comment {
                     comment.push(ln.get(3..).unwrap().trim().to_string());
@@ -269,7 +271,7 @@ impl Tree {
                     }
                 }
             } else {
-                auxilaries.push(String::from(ln));
+                auxilaries.push(ln.to_string());
             }
         }
         self.new_todo_if_any(name, owner, comment, dependencies, auxilaries)
@@ -286,7 +288,7 @@ impl Tree {
             BTreeMap::new();
         for (key, todo) in &self.dict {
             for dep_raw in &todo.borrow().dependencies {
-                let dep_nom = String::from(dep_raw.replace("~", "").trim());
+                let dep_nom = dep_raw.replace("~", "").trim().to_string();
                 noparent.remove(&dep_nom);
                 let cur_completed = dep_raw.contains("~");
                 if self.dict.contains_key(&dep_nom) {
@@ -318,7 +320,7 @@ impl Tree {
                             todoindepsonly.insert(
                                 dep_nom.clone(),
                                 (
-                                    String::from(key),
+                                    key.to_string(),
                                     Todo::new(
                                         dep_raw.clone(),
                                         String::new(),
@@ -355,10 +357,11 @@ impl Tree {
             if owner == "" && comment.len() == 0 && dependencies.len() == 0 {
                 return Ok(());
             } else {
-                return Err(TodoError::Input(String::from(
+                return Err(TodoError::Input(
                     "ERR-013: Missing '# [TODO]' before '- @', '- :', \
-                         or '-  %' in the todotree markdown file.",
-                )));
+                         or '-  %' in the todotree markdown file."
+                        .to_string(),
+                ));
             }
         }
         let comt: Vec<String> = match self.separator.as_str() {

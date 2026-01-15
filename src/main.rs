@@ -158,7 +158,7 @@ fn print_tree(
     };
     let separator = match matches.opt_str("separator") {
         Some(x) => x,
-        None => String::from("\n"),
+        None => "\n".to_string(),
     };
     let tree = Tree::new(
         inputs,
