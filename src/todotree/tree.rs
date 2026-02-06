@@ -14,8 +14,6 @@ pub struct Tree {
     format: Format,
     /// maximum length of the three columns
     maxlens: [usize; 3],
-    /// a map of todos, key is map name
-    dict: BTreeMap<String, Rc<RefCell<Todo>>>,
     /// a separator joining multiple lines of comments
     separator: String,
     /// auxilary lines before the first todo
@@ -64,6 +62,7 @@ impl Tree {
         hide_comment: bool,
         hide_owner: bool,
         reverse: bool,
+        sort: bool,
     ) -> Result<Self, TodoError> {
         let format_enum = match format {
             "html" => Format::Html,
@@ -109,26 +108,26 @@ impl Tree {
             )?)),
             format: format_enum.clone(),
             maxlens: [0; 3],
-            dict: BTreeMap::new(),
             separator: separator.to_string(),
             auxilaries: Vec::new(),
             no_color: no_color,
             reverse: reverse,
         };
+        let mut dict = BTreeMap::new();
+        let mut list: Vec<String> = Vec::new();
         for mdfile in inputs {
-            tree.readmd(mdfile, hide_comment)?;
+            tree.readmd(mdfile, hide_comment, sort, &mut dict, &mut list)?;
         }
         // check dict
-        if tree.dict.len() == 0 {
+        if dict.len() == 0 {
             return Err(TodoError::Input(
                 "ERR-010: The markdown file does not have any TODO".to_string(),
             ));
         }
         // add all TODOs that have no parent to ROOT's dependencies
         if tree.root.borrow().dependencies.len() == 0 {
-            let mut noparent: BTreeSet<String> =
-                tree.dict.keys().cloned().collect();
-            for todo in tree.dict.values() {
+            let mut noparent: BTreeSet<String> = dict.keys().cloned().collect();
+            for todo in dict.values() {
                 for dep in &todo.borrow().dependencies {
                     let dep = dep.replace("~", "");
                     noparent.remove(&dep);
@@ -141,18 +140,21 @@ impl Tree {
                     ));
                 }
             }
-            for nm in tree.dict.keys() {
+            if sort {
+                list.sort();
+            }
+            for nm in &list {
                 if noparent.contains(nm) {
                     tree.root.borrow_mut().dependencies.push(nm.clone());
                 }
             }
         }
-        tree.check_todos_in_dep_only(auto_add)?;
+        tree.check_todos_in_dep_only(auto_add, &mut dict)?;
         let mut path: BTreeSet<String> = BTreeSet::new();
         let mut visited: BTreeSet<String> = BTreeSet::new();
         tree.root.borrow_mut().build_tree(
             &mut visited,
-            &tree.dict,
+            &dict,
             &mut tree.maxlens,
             &mut path,
             0,
@@ -209,6 +211,9 @@ impl Tree {
         &mut self,
         mdfile: &str,
         hide_comment: bool,
+        sort: bool,
+        dict: &mut BTreeMap<String, Rc<RefCell<Todo>>>,
+        list: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         let mut name = String::new();
         let mut owner = String::new();
@@ -225,6 +230,9 @@ impl Tree {
                     comment,
                     dependencies,
                     auxilaries,
+                    sort,
+                    dict,
+                    list,
                 )?;
                 name = ln.get(2..).map(|x| x.trim().to_string()).ok_or_else(
                     || TodoError::Input(format!("ERR-015: TODO name '{}'", ln)),
@@ -274,24 +282,33 @@ impl Tree {
                 auxilaries.push(ln.to_string());
             }
         }
-        self.new_todo_if_any(name, owner, comment, dependencies, auxilaries)
+        self.new_todo_if_any(
+            name,
+            owner,
+            comment,
+            dependencies,
+            auxilaries,
+            sort,
+            dict,
+            list,
+        )
     }
 
     /// Returns the todos that are defined in dependencies only.
     fn check_todos_in_dep_only(
         &mut self,
         auto_add: bool,
+        dict: &mut BTreeMap<String, Rc<RefCell<Todo>>>,
     ) -> Result<(), TodoError> {
-        let mut noparent: BTreeSet<String> =
-            self.dict.keys().cloned().collect();
+        let mut noparent: BTreeSet<String> = dict.keys().cloned().collect();
         let mut todoindepsonly: BTreeMap<String, (String, Todo)> =
             BTreeMap::new();
-        for (key, todo) in &self.dict {
+        for (key, todo) in dict.iter() {
             for dep_raw in &todo.borrow().dependencies {
                 let dep_nom = dep_raw.replace("~", "").trim().to_string();
                 noparent.remove(&dep_nom);
                 let cur_completed = dep_raw.contains("~");
-                if self.dict.contains_key(&dep_nom) {
+                if dict.contains_key(&dep_nom) {
                     if cur_completed {
                         return Err(TodoError::Input(format!(
                             "ERR-011: TODO '{}' has its own '# ' line, \
@@ -336,7 +353,7 @@ impl Tree {
             }
         }
         for (k, v) in todoindepsonly {
-            self.dict.insert(k, Rc::new(RefCell::new(v.1)));
+            dict.insert(k, Rc::new(RefCell::new(v.1)));
         }
         Ok(())
     }
@@ -349,8 +366,11 @@ impl Tree {
         name: String,
         owner: String,
         comment: Vec<String>,
-        dependencies: Vec<String>,
+        mut dependencies: Vec<String>,
         auxilaries: Vec<String>,
+        sort: bool,
+        dict: &mut BTreeMap<String, Rc<RefCell<Todo>>>,
+        list: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         if name == "" {
             self.auxilaries = auxilaries;
@@ -370,10 +390,12 @@ impl Tree {
                 vec![comment.join(self.separator.as_str()); 1]
             }
         };
+        if sort {
+            dependencies.sort();
+        }
         let todo = Todo::new(name, owner, comt, dependencies, auxilaries)?;
         let nm = todo.name.clone();
-        if self
-            .dict
+        if dict
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))
             .is_some()
         {
@@ -382,6 +404,7 @@ impl Tree {
                 nm
             )));
         }
+        list.push(nm);
         Ok(())
     }
 }

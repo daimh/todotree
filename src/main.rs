@@ -25,7 +25,12 @@ fn main() -> Result<(), TodoError> {
     );
     opts.optflag("M", "hide-comment", "Hide comment column.");
     opts.optflag("O", "hide-owner", "Hide owner column.");
-    opts.optflag("R", "reverse", "Reverse the tree order.");
+    opts.optflag("R", "reverse", "Reverse tree order (root at bottom).");
+    opts.optflag(
+        "S",
+        "sort",
+        "Sort tasks that are dependencies of the same task.",
+    );
     opts.optopt(
         "d",
         "depth",
@@ -174,6 +179,7 @@ fn print_tree(
         matches.opt_present("hide-comment"),
         matches.opt_present("hide-owner"),
         matches.opt_present("reverse"),
+        matches.opt_present("sort"),
     )?;
     print!("{}", tree);
     Ok(())
