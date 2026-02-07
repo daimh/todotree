@@ -2,7 +2,7 @@
 
 # movie
 - @ family
-- : dinner garden lawn
+- : garden dinner lawn
 
 # dinner
 - @ Mom

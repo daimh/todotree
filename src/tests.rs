@@ -35,7 +35,7 @@ fn examples() {
                     false,
                     false,
                     reverse,
-                    false,
+                    true,
                 );
                 let tree = match result {
                     Ok(t) => t,

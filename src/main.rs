@@ -1,4 +1,5 @@
 use getopts::{Matches, Options};
+use git_version::git_version;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::OpenOptions;
@@ -66,7 +67,7 @@ fn main() -> Result<(), TodoError> {
     );
     opts.optflag("h", "help", "Show this help and exit.");
     opts.optflag("", "version", "Show version information and exit.");
-    let matches = opts.parse(&args[1..])?;
+    let mut matches = opts.parse(&args[1..])?;
     if matches.opt_present("version") {
         return print_version();
     }
@@ -103,8 +104,14 @@ fn main() -> Result<(), TodoError> {
         .into_iter()
         .map(|s| (s.to_string(), false))
         .collect::<BTreeMap<String, bool>>();
-    let free = &matches.free;
-    let targets = if free.is_empty() { &vec![] } else { free };
+    if matches.opt_present("sort") {
+        matches.free.sort();
+    }
+    let targets = if matches.free.is_empty() {
+        &vec![]
+    } else {
+        &matches.free
+    };
     print_tree(&matches, &inputs, &mut owners, targets)?;
     if matches.opt_present("refresh") {
         match matches.opt_str("format") {
@@ -186,7 +193,8 @@ fn print_tree(
 }
 
 fn print_version() -> Result<(), TodoError> {
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const VERSION: &str =
+        git_version!(args = ["--tags", "--always", "--long", "--dirty"]);
     const LICENSE: &str = env!("CARGO_PKG_LICENSE");
     const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
     println!(

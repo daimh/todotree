@@ -391,7 +391,7 @@ impl Tree {
             }
         };
         if sort {
-            dependencies.sort();
+            dependencies.sort_by_key(|p| p.replace("~", ""));
         }
         let todo = Todo::new(name, owner, comt, dependencies, auxilaries)?;
         let nm = todo.name.clone();
