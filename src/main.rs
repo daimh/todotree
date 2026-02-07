@@ -1,4 +1,5 @@
 use getopts::{Matches, Options};
+use git_version::git_version;
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::OpenOptions;
@@ -186,7 +187,8 @@ fn print_tree(
 }
 
 fn print_version() -> Result<(), TodoError> {
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    const VERSION: &str =
+        git_version!(args = ["--tags", "--always", "--long", "--dirty"]);
     const LICENSE: &str = env!("CARGO_PKG_LICENSE");
     const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
     println!(

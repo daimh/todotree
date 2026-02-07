@@ -1,7 +1,7 @@
 #!/usr/bin/env -S todotree -i
 
 # movie
-- : dinner garden lawn
+- : garden dinner lawn
 
 # dinner
 
