@@ -30,6 +30,8 @@ impl fmt::Display for Tree {
             for ln in &self.auxilaries {
                 writeln!(fo, "{}", ln)?;
             }
+        } else if self.format == Format::Html {
+            writeln!(fo, "<html><head><meta charset='utf-8'></head><body>")?;
         }
         let mut connectors: Vec<bool> = Vec::new();
         let mut visited: BTreeSet<String> = BTreeSet::new();
@@ -42,6 +44,9 @@ impl fmt::Display for Tree {
             self.no_color,
             self.reverse,
         )?;
+        if self.format == Format::Html {
+            writeln!(fo, "</body></html>")?;
+        }
         Ok(())
     }
 }

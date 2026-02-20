@@ -57,8 +57,9 @@ fn examples() {
                 };
                 assert!(
                     standard == output,
-                    "ERR-904: md: {}, format: {}, hide: {}, depth: {}",
+                    "ERR-904: md: {}, outdir: '{}', format: {}, hide: {}, depth: {}",
                     &md,
+                    outdir,
                     format,
                     hide,
                     depth,
