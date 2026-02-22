@@ -111,42 +111,41 @@ fn main() -> Result<(), TodoError> {
     } else {
         &matches.free
     };
-    print_tree(&matches, &inputs, &mut owners, targets)?;
-    if matches.opt_present("refresh") {
-        match matches.opt_str("format") {
-            Some(x) => {
-                if x != "term" {
-                    return Ok(());
+    loop {
+        let rtn = print_tree(&matches, &inputs, &mut owners, targets);
+        if !matches.opt_present("refresh") {
+            return rtn;
+        }
+        if matches.opt_str("format").is_some_and(|s| s != "term") {
+            return rtn;
+        }
+        if let Err(_) = rtn {
+            if let Err(TodoError::Io(ref err)) = rtn {
+                if err.kind() == io::ErrorKind::NotFound {
+                    return rtn;
                 }
             }
-            None => (),
-        };
-        loop {
-            let mut inotify = Inotify::init()?;
-            for mdfile in &inputs {
-                if let Err(e) = inotify
-                    .watches()
-                    .add(&mdfile, WatchMask::MODIFY | WatchMask::CLOSE)
-                {
-                    if e.kind() == ErrorKind::NotFound {
-                        thread::sleep(Duration::from_secs(1));
-                    } else {
-                        return Err(TodoError::Input(format!(
-                            "ERR-019: Inotify, {}",
-                            e
-                        )));
-                    }
-                }
-            }
-            let mut buffer = [0u8; 4096];
-            inotify.read_events_blocking(&mut buffer)?;
-            if let Err(e) = print_tree(&matches, &inputs, &mut owners, targets)
+            println!("{:?}", rtn);
+        }
+        let mut inotify = Inotify::init()?;
+        for mdfile in &inputs {
+            if let Err(e) = inotify
+                .watches()
+                .add(&mdfile, WatchMask::CLOSE | WatchMask::MODIFY)
             {
-                println!("{}", e);
+                if e.kind() == ErrorKind::NotFound {
+                    thread::sleep(Duration::from_secs(1));
+                } else {
+                    return Err(TodoError::Input(format!(
+                        "ERR-019: Inotify, {}",
+                        e
+                    )));
+                }
             }
         }
+        let mut buffer = [0u8; 4096];
+        inotify.read_events_blocking(&mut buffer)?;
     }
-    Ok(())
 }
 
 fn print_tree(

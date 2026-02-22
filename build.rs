@@ -1,5 +1,5 @@
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=.");
     let git_describe =
         get_git_descfribe().unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=GIT_DESCRIBE={}", git_describe);
