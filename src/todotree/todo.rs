@@ -573,13 +573,23 @@ impl Todo {
             0 => &vec![String::new(); 1],
             _ => &self.comment,
         };
-        let dgt_width = comt.len().to_string().len();
+        let mut non_empty_line_cnt = 0;
+        for line in comt {
+            if line != "" {
+                non_empty_line_cnt += 1;
+            }
+        }
+        let dgt_width = non_empty_line_cnt.to_string().len();
         let seq_width = match self.comment.len() {
             0 | 1 => 0,
             _ => dgt_width + 2,
         };
         let cmt_width = maxlens[2] - seq_width;
+        let mut empty_line_count = 0;
         for (idx, line) in comt.iter().enumerate() {
+            if line == "" {
+                empty_line_count += 1;
+            }
             if idx > 0 {
                 self.fmt_cont_comment(
                     fo, connectors, maxlens, space, bol, reverse, location,
@@ -589,10 +599,16 @@ impl Todo {
             loop {
                 let slen = min(line.len() - start, cmt_width);
                 if seq_width > 0 {
-                    match start {
-                        0 => write!(fo, "{:0>dgt_width$}.{}", idx + 1, space),
-                        _ => write!(fo, "{}", space.repeat(seq_width)),
-                    }?;
+                    if start == 0 && line.len() != 0 {
+                        write!(
+                            fo,
+                            "{:0>dgt_width$}.{}",
+                            idx + 1 - empty_line_count,
+                            space
+                        )?;
+                    } else {
+                        write!(fo, "{}", space.repeat(seq_width))?;
+                    }
                 }
                 write!(fo, "{}", &line[start..start + slen])?;
                 write!(fo, "{}", space.repeat(cmt_width - slen))?;

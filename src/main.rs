@@ -92,7 +92,6 @@ fn main() -> Result<(), TodoError> {
             .open(path)?;
         file.write_all(content.as_bytes())?;
         println!("Created todotree.md");
-        return Ok(());
     }
     let mut inputs = matches.opt_strs("input");
     if inputs.len() == 0 {
