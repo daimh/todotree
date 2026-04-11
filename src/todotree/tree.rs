@@ -283,7 +283,7 @@ impl Tree {
                 comment = Vec::new();
                 dependencies = Vec::new();
                 auxilaries = Vec::new();
-            } else if ln.starts_with("- @") {
+            } else if ln.starts_with("- @ ") {
                 if owner.len() > 0 {
                     return Err(TodoError::Input(
                         "ERR-008: Owner cannot be specified multiple times"
@@ -291,11 +291,14 @@ impl Tree {
                     ));
                 }
                 owner.push_str(ln.get(3..).unwrap().trim());
-            } else if ln.starts_with("- %") {
+            } else if ln.starts_with("- % ") || ln == "- %" {
                 if !hide_comment {
-                    comment.push(ln.get(3..).unwrap().trim().to_string());
+                    comment.push(match ln {
+                        "- %" => String::new(),
+                        _ => ln.get(4..).unwrap().trim_end().to_string(),
+                    });
                 }
-            } else if ln.starts_with("- :") {
+            } else if ln.starts_with("- : ") {
                 dependencies.append(
                     &mut ln
                         .get(3..)
