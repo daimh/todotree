@@ -27,18 +27,13 @@ pub struct Todo {
 
 impl Todo {
     pub fn new(
-        mut name: String,
+        name: String,
+        status: Status,
         owner: String,
         comment: Vec<String>,
         dependencies: Vec<String>,
         auxilaries: Vec<String>,
     ) -> Result<Self, TodoError> {
-        let status = if name.starts_with("~") {
-            name = name.replace("~", "");
-            Status::Completed
-        } else {
-            Status::Pending
-        };
         static SPECIALS: [char; 18] = [
             '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
             '\'', '"', '.', '?', '/',

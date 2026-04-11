@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs::read_to_string;
+use std::path::Path;
 use std::rc::Rc;
 
 /// A tree of todos
@@ -84,7 +85,7 @@ impl Tree {
         if reverse && format_enum != Format::Term && format_enum != Format::Html
         {
             return Err(TodoError::Input(
-                "ERR-024: '--reverse' works with Term or Html only".to_string(),
+                "ERR-020: '--reverse' works with Term or Html only".to_string(),
             ));
         }
         let mut screen_width: usize = 80;
@@ -106,6 +107,7 @@ impl Tree {
         let mut tree = Tree {
             root: Rc::new(RefCell::new(Todo::new(
                 ROOT.to_string(),
+                Status::Pending,
                 String::new(),
                 Vec::new(),
                 targets.to_vec(),
@@ -121,7 +123,21 @@ impl Tree {
         let mut dict = BTreeMap::new();
         let mut list: Vec<String> = Vec::new();
         for mdfile in inputs {
-            tree.readmd(mdfile, hide_comment, sort, &mut dict, &mut list)?;
+            let suffix = match inputs.len() {
+                1 => "",
+                _ => &format!(
+                    "@{}",
+                    Path::new(mdfile).file_stem().unwrap().to_string_lossy()
+                ),
+            };
+            tree.readmd(
+                suffix,
+                mdfile,
+                hide_comment,
+                sort,
+                &mut dict,
+                &mut list,
+            )?;
         }
         // check dict
         if dict.len() == 0 {
@@ -214,6 +230,7 @@ impl Tree {
     /// Creates a list of todos from a markdown fie.
     fn readmd(
         &mut self,
+        suffix: &str,
         mdfile: &str,
         hide_comment: bool,
         sort: bool,
@@ -221,6 +238,7 @@ impl Tree {
         list: &mut Vec<String>,
     ) -> Result<(), TodoError> {
         let mut name = String::new();
+        let mut status = Status::Pending;
         let mut owner = String::new();
         let mut comment: Vec<String> = Vec::new();
         let mut dependencies: Vec<String> = Vec::new();
@@ -231,6 +249,7 @@ impl Tree {
             if ln.starts_with("# ") {
                 self.new_todo_if_any(
                     name,
+                    status,
                     owner,
                     comment,
                     dependencies,
@@ -247,7 +266,19 @@ impl Tree {
                         "ERR-009: '{}' is a reserved TODO name keyword",
                         ROOT
                     )));
+                } else if name.contains('@') {
+                    return Err(TodoError::Input(format!(
+                        "ERR-017: TODO name '{}' should not contain '@'",
+                        name
+                    )));
                 }
+                status = if name.starts_with("~") {
+                    name = name.replace("~", "");
+                    Status::Completed
+                } else {
+                    Status::Pending
+                };
+                name = format!("{}{}", name, suffix);
                 owner = String::new();
                 comment = Vec::new();
                 dependencies = Vec::new();
@@ -259,7 +290,7 @@ impl Tree {
                             .to_string(),
                     ));
                 }
-                owner.push_str(ln.get(3..).unwrap().trim())
+                owner.push_str(ln.get(3..).unwrap().trim());
             } else if ln.starts_with("- %") {
                 if !hide_comment {
                     comment.push(ln.get(3..).unwrap().trim().to_string());
@@ -271,7 +302,13 @@ impl Tree {
                         .unwrap()
                         .trim()
                         .split_whitespace()
-                        .map(str::to_string)
+                        .map(|s| {
+                            if s.contains('@') {
+                                s.to_string()
+                            } else {
+                                format!("{s}{suffix}")
+                            }
+                        })
                         .collect::<Vec<String>>(),
                 );
                 for dep in dependencies.iter() {
@@ -289,6 +326,7 @@ impl Tree {
         }
         self.new_todo_if_any(
             name,
+            status,
             owner,
             comment,
             dependencies,
@@ -339,12 +377,18 @@ impl Tree {
                     }
                     None => {
                         if auto_add {
+                            let dep_status = if dep_raw.starts_with("~") {
+                                Status::Completed
+                            } else {
+                                Status::Pending
+                            };
                             todoindepsonly.insert(
                                 dep_nom.clone(),
                                 (
                                     key.to_string(),
                                     Todo::new(
-                                        dep_raw.clone(),
+                                        dep_nom,
+                                        dep_status,
                                         String::new(),
                                         Vec::new(),
                                         Vec::new(),
@@ -369,6 +413,7 @@ impl Tree {
     fn new_todo_if_any(
         &mut self,
         name: String,
+        status: Status,
         owner: String,
         comment: Vec<String>,
         mut dependencies: Vec<String>,
@@ -398,7 +443,8 @@ impl Tree {
         if sort {
             dependencies.sort_by_key(|p| p.replace("~", ""));
         }
-        let todo = Todo::new(name, owner, comt, dependencies, auxilaries)?;
+        let todo =
+            Todo::new(name, status, owner, comt, dependencies, auxilaries)?;
         let nm = todo.name.clone();
         if dict
             .insert(nm.clone(), Rc::new(RefCell::new(todo)))

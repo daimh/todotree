@@ -1,6 +1,7 @@
 use super::*;
 use std::fmt::Write;
 use std::fs::{read_dir, read_to_string};
+use std::path::Path;
 
 #[test]
 fn examples() {
@@ -20,6 +21,7 @@ fn examples() {
                 3 => (false, -1, "examples/depth/neg1/", false, &f4),
                 _ => (false, 0, "examples/reverse/", true, &f2),
             };
+            println!("Index: {}\t{}", md, outdir);
             for format in formats {
                 let result = Tree::new(
                     &inputs,
@@ -39,7 +41,9 @@ fn examples() {
                 );
                 let tree = match result {
                     Ok(t) => t,
-                    Err(e) => panic!("ERR-901: md: {}, e: {}", md, e),
+                    Err(e) => {
+                        panic!("ERR-901: idx: {}, md: {}, e: {}", idx, md, e)
+                    }
                 };
                 let mut output = String::new();
                 match write!(output, "{}", tree) {
@@ -71,14 +75,15 @@ fn examples() {
 
 #[test]
 fn errors() {
-    for path in read_dir("src/tests/").unwrap() {
+    for path in read_dir("tests/errors/").unwrap() {
         let md = path.unwrap().path().display().to_string();
-        if !md.ends_with(".md") || !md.starts_with("src/tests/ERR") {
+        if !md.ends_with(".md") || !md.starts_with("tests/errors/ERR") {
             continue;
         }
         if md.len() < 20 {
             panic!("ERR-906: md: {}", md);
         }
+        println!("Input: {}", md);
         let inputs = vec![md.clone()];
         let options = md[17..].replace(".md", "");
         let mut auto_add = false;
@@ -110,11 +115,56 @@ fn errors() {
             false,
         ) {
             Err(e) => {
-                assert!(e.to_string().starts_with(&md[10..17]), "{}, {}", md, e)
+                let err_code =
+                    &Path::new(&md).file_stem().unwrap().to_string_lossy()
+                        [0..7];
+                assert!(e.to_string().starts_with(err_code), "{}, {}", md, e)
             }
             _ => {
                 panic!("ERR-905: md: {}", md);
             }
         }
     }
+}
+
+#[test]
+fn multi() {
+    let inputs = vec![
+        String::from("tests/multi/1.md"),
+        String::from("tests/multi/2.md"),
+    ];
+    let result = Tree::new(
+        &inputs,
+        &mut BTreeMap::<String, bool>::new(),
+        &mut Vec::<String>::new(),
+        80,
+        "term",
+        false,
+        0,
+        "\n",
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+    );
+    let tree = match result {
+        Ok(t) => t,
+        Err(e) => {
+            panic!("ERR-907: multi, {}", e);
+        }
+    };
+    let mut output = String::new();
+    match write!(output, "{}", tree) {
+        Ok(s) => s,
+        Err(e) => panic!("ERR-908: Failed to write '{}'", e),
+    }
+    let standard = match read_to_string("tests/multi/out.term") {
+        Ok(s) => s,
+        Err(e) => {
+            panic!("ERR-909: multi, {}", e);
+        }
+    };
+    assert!(standard == output, "ERR-910: multi");
 }
