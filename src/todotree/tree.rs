@@ -14,7 +14,7 @@ pub struct Tree {
     /// output format
     format: Format,
     /// maximum length of the three columns
-    maxlens: [usize; 3],
+    maxwidth: [usize; 3],
     /// a separator joining multiple lines of comments
     separator: String,
     /// auxilary lines before the first todo
@@ -40,7 +40,7 @@ impl fmt::Display for Tree {
             fo,
             &mut connectors,
             &mut visited,
-            &self.maxlens,
+            &self.maxwidth,
             &self.format,
             self.no_color,
             self.reverse,
@@ -114,7 +114,7 @@ impl Tree {
                 Vec::new(),
             )?)),
             format: format_enum.clone(),
-            maxlens: [0; 3],
+            maxwidth: [0; 3],
             separator: separator.to_string(),
             auxilaries: Vec::new(),
             no_color: no_color,
@@ -176,7 +176,7 @@ impl Tree {
         tree.root.borrow_mut().build_tree(
             &mut visited,
             &dict,
-            &mut tree.maxlens,
+            &mut tree.maxwidth,
             &mut path,
             0,
             screen_width,

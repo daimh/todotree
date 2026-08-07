@@ -4,6 +4,7 @@ use std::cmp::{max, min};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::rc::Rc;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 #[derive(PartialEq)]
 enum Location {
@@ -34,10 +35,7 @@ impl Todo {
         dependencies: Vec<String>,
         auxilaries: Vec<String>,
     ) -> Result<Self, TodoError> {
-        static SPECIALS: [char; 18] = [
-            '!', '@', '$', '%', '%', '&', '(', ')', '-', '_', '=', '+', ':',
-            '\'', '"', '.', '?', '/',
-        ];
+        static SPACES: [char; 4] = [' ', '\u{00A0}', '\u{2009}', '\u{3000}'];
         if name != ROOT {
             if name.ends_with(ROOT) {
                 return Err(TodoError::Input(format!(
@@ -46,16 +44,11 @@ impl Todo {
                 )));
             }
             for c in name.chars() {
-                if !SPECIALS.contains(&c)
-                    && (c < 'a' || c > 'z')
-                    && (c < 'A' || c > 'Z')
-                    && (c < '0' || c > '9')
-                {
+                if SPACES.contains(&c) {
                     return Err(TodoError::Input(format!(
-                        "ERR-001: TODO name '{}' contains unsupported \
-                            character '{}', which is not alphabet, digit, \
-                            or {:?}",
-                        name, c, SPECIALS
+                        "ERR-001: TODO name '{}' contains space \
+                            character '{}'",
+                        name, c,
                     )));
                 }
             }
@@ -80,7 +73,7 @@ impl Todo {
         &mut self,
         visited: &mut BTreeSet<String>,
         map: &BTreeMap<String, Rc<RefCell<Todo>>>,
-        maxlens: &mut [usize; 3],
+        maxwidth: &mut [usize; 3],
         path: &mut BTreeSet<String>,
         depth: usize,
         screen_width: usize,
@@ -128,7 +121,7 @@ impl Todo {
                     let own_child = child.borrow_mut().build_tree(
                         visited,
                         map,
-                        maxlens,
+                        maxwidth,
                         path,
                         depth + 1,
                         screen_width,
@@ -164,7 +157,7 @@ impl Todo {
             )));
         }
         if self.name == ROOT {
-            self.get_maxlens(maxlens, 0, screen_width)?;
+            self.get_maxwidth(maxwidth, 0, screen_width)?;
         } else if self.dependencies.len() > 0
             && !self.name.ends_with(ROOT)
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
@@ -175,44 +168,46 @@ impl Todo {
         Ok(own_me)
     }
 
-    pub fn get_maxlens(
+    pub fn get_maxwidth(
         &mut self,
-        maxlens: &mut [usize; 3],
+        maxwidth: &mut [usize; 3],
         depth: usize,
         screen_width: usize,
     ) -> Result<(), TodoError> {
         for child in &self.children {
-            child
-                .borrow_mut()
-                .get_maxlens(maxlens, depth + 1, screen_width)?;
+            child.borrow_mut().get_maxwidth(
+                maxwidth,
+                depth + 1,
+                screen_width,
+            )?;
         }
         if self.name == ROOT {
-            if maxlens[1] > 0 {
+            if maxwidth[1] > 0 {
                 self.owner = "OWNER".to_string()
             }
-            if maxlens[2] > 0 {
+            if maxwidth[2] > 0 {
                 self.comment = vec!["COMMENT".to_string(); 1];
             }
         }
-        maxlens[0] = max(maxlens[0], depth * 4 + self.name.len());
-        maxlens[1] = max(maxlens[1], self.owner.len());
+        maxwidth[0] = max(maxwidth[0], depth * 4 + self.name.width());
+        maxwidth[1] = max(maxwidth[1], self.owner.width());
         for line in &self.comment {
-            maxlens[2] = max(maxlens[2], line.len());
+            maxwidth[2] = max(maxwidth[2], line.width());
         }
         if self.comment.len() > 1 {
-            maxlens[2] += self.comment.len().to_string().len() + 2;
+            maxwidth[2] += self.comment.len().to_string().len() + 2;
         }
         if self.name == ROOT {
-            if screen_width <= maxlens[0] + maxlens[1] + 8 {
+            if screen_width <= maxwidth[0] + maxwidth[1] + 8 {
                 return Err(TodoError::Input(format!(
                     "ERR-005: Screen width is {}, but this todotree \
                         needs at least {} columns",
                     screen_width,
-                    maxlens[0] + maxlens[1] + 9
+                    maxwidth[0] + maxwidth[1] + 9
                 )));
             }
-            maxlens[2] =
-                min(maxlens[2], screen_width - maxlens[0] - maxlens[1] - 8);
+            maxwidth[2] =
+                min(maxwidth[2], screen_width - maxwidth[0] - maxwidth[1] - 8);
         }
         Ok(())
     }
@@ -222,7 +217,7 @@ impl Todo {
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
         visited: &mut BTreeSet<String>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         format: &Format,
         no_color: bool,
         reverse: bool,
@@ -240,12 +235,12 @@ impl Todo {
         };
         if (*format == Format::Html || *format == Format::Term)
             && self.name == ROOT
-            && maxlens[1] + maxlens[2] > 0
+            && maxwidth[1] + maxwidth[2] > 0
         {
             self.fmt_row_separator(
                 fo,
                 connectors,
-                maxlens,
+                maxwidth,
                 space,
                 bol,
                 eol,
@@ -259,7 +254,7 @@ impl Todo {
                 if visited.insert(child.borrow().name.clone()) {
                     connectors.push(pos + 1 == self.children.len());
                     child.borrow().fmt_tree(
-                        fo, connectors, visited, maxlens, format, no_color,
+                        fo, connectors, visited, maxwidth, format, no_color,
                         reverse,
                     )?;
                     connectors.pop();
@@ -297,10 +292,10 @@ impl Todo {
                 writeln!(fo, "{}{{", space)?;
                 writeln!(fo, "{}  \"name\": \"{}\",", space, self.name)?;
                 writeln!(fo, "{}  \"status\": \"{}\",", space, self.status)?;
-                if maxlens[1] > 0 {
+                if maxwidth[1] > 0 {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
                 }
-                if maxlens[2] > 0 && self.comment.len() > 0 {
+                if maxwidth[2] > 0 && self.comment.len() > 0 {
                     writeln!(
                         fo,
                         "{}  \"comment\": \"{}\",",
@@ -325,7 +320,8 @@ impl Todo {
                     ""
                 };
                 self.fmt_table(
-                    fo, connectors, maxlens, space, bol, eol, boc, eoc, reverse,
+                    fo, connectors, maxwidth, space, bol, eol, boc, eoc,
+                    reverse,
                 )?;
             }
             Format::Html => {
@@ -344,7 +340,8 @@ impl Todo {
                     ""
                 };
                 self.fmt_table(
-                    fo, connectors, maxlens, space, bol, eol, boc, eoc, reverse,
+                    fo, connectors, maxwidth, space, bol, eol, boc, eoc,
+                    reverse,
                 )?;
             }
         }
@@ -356,7 +353,7 @@ impl Todo {
                         writeln!(fo, "{}    ,", space)?;
                     }
                     child.borrow().fmt_tree(
-                        fo, connectors, visited, maxlens, format, no_color,
+                        fo, connectors, visited, maxwidth, format, no_color,
                         reverse,
                     )?;
                     connectors.pop();
@@ -403,7 +400,7 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &mut Vec<bool>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         space: &str,
         bol: &str,
         eol: &str,
@@ -411,7 +408,7 @@ impl Todo {
         eoc: &str,
         reverse: bool,
     ) -> fmt::Result {
-        if maxlens[1] + maxlens[2] == 0 {
+        if maxwidth[1] + maxwidth[2] == 0 {
             self.fmt_connector(fo, connectors, space, bol, boc, eoc, reverse)?;
             return write!(fo, "{}", eol);
         }
@@ -419,17 +416,18 @@ impl Todo {
         write!(
             fo,
             "{}",
-            space.repeat(maxlens[0] - connectors.len() * 4 - self.name.len())
+            space
+                .repeat(maxwidth[0] - connectors.len() * 4 - self.name.width())
         )?;
         write!(fo, "{}│{}", space, space)?;
-        if maxlens[1] > 0 {
+        if maxwidth[1] > 0 {
             write!(
                 fo,
                 "{}{}│",
                 self.owner,
-                space.repeat(1 + maxlens[1] - self.owner.len())
+                space.repeat(1 + maxwidth[1] - self.owner.width())
             )?;
-            if maxlens[2] > 0 {
+            if maxwidth[2] > 0 {
                 write!(fo, "{}", space)?;
             }
         }
@@ -455,14 +453,14 @@ impl Todo {
                 Location::Mid
             }
         };
-        match maxlens[2] {
+        match maxwidth[2] {
             0 => write!(fo, "{}", eol)?,
             _ => self.fmt_comment(
-                fo, connectors, maxlens, space, bol, eol, reverse, &location,
+                fo, connectors, maxwidth, space, bol, eol, reverse, &location,
             )?,
         }
         self.fmt_row_separator(
-            fo, connectors, maxlens, space, bol, eol, reverse, &location,
+            fo, connectors, maxwidth, space, bol, eol, reverse, &location,
         )
     }
 
@@ -470,7 +468,7 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         space: &str,
         bol: &str,
         reverse: bool,
@@ -502,7 +500,7 @@ impl Todo {
         write!(
             fo,
             "{}",
-            space.repeat(maxlens[0] - 1 - connectors.len() * 4)
+            space.repeat(maxwidth[0] - 1 - connectors.len() * 4)
         )
     }
 
@@ -510,7 +508,7 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         space: &str,
         bol: &str,
         eol: &str,
@@ -518,36 +516,36 @@ impl Todo {
         location: &Location,
     ) -> fmt::Result {
         self.fmt_space_before_table(
-            fo, connectors, maxlens, space, bol, reverse, location,
+            fo, connectors, maxwidth, space, bol, reverse, location,
         )?;
         let (cl, cm, cr) = match location {
             Location::Top => ("┌", "┬", "┐"),
             Location::Mid => ("├", "┼", "┤"),
             Location::Bottom => ("└", "┴", "┘"),
         };
-        write!(fo, "{}{}─{}", space, cl, "─".repeat(maxlens[1]))?;
-        if maxlens[1] > 0 && maxlens[2] > 0 {
+        write!(fo, "{}{}─{}", space, cl, "─".repeat(maxwidth[1]))?;
+        if maxwidth[1] > 0 && maxwidth[2] > 0 {
             write!(fo, "─{}─", cm)?;
         }
-        write!(fo, "{}─{}{}", "─".repeat(maxlens[2]), cr, eol)
+        write!(fo, "{}─{}{}", "─".repeat(maxwidth[2]), cr, eol)
     }
 
     fn fmt_cont_comment(
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         space: &str,
         bol: &str,
         reverse: bool,
         location: &Location,
     ) -> fmt::Result {
         self.fmt_space_before_table(
-            fo, connectors, maxlens, space, bol, reverse, location,
+            fo, connectors, maxwidth, space, bol, reverse, location,
         )?;
         write!(fo, "{}│{}", space, space)?;
-        write!(fo, "{}", space.repeat(maxlens[1]))?;
-        if maxlens[1] > 0 && maxlens[2] > 0 {
+        write!(fo, "{}", space.repeat(maxwidth[1]))?;
+        if maxwidth[1] > 0 && maxwidth[2] > 0 {
             write!(fo, "{}│{}", space, space)?;
         }
         Ok(())
@@ -557,7 +555,7 @@ impl Todo {
         &self,
         fo: &mut fmt::Formatter<'_>,
         connectors: &Vec<bool>,
-        maxlens: &[usize; 3],
+        maxwidth: &[usize; 3],
         space: &str,
         bol: &str,
         eol: &str,
@@ -579,7 +577,7 @@ impl Todo {
             0 | 1 => 0,
             _ => dgt_width + 2,
         };
-        let cmt_width = maxlens[2] - seq_width;
+        let cmt_width = maxwidth[2] - seq_width;
         let mut empty_line_count = 0;
         for (idx, line) in comt.iter().enumerate() {
             if line == "" {
@@ -587,12 +585,11 @@ impl Todo {
             }
             if idx > 0 {
                 self.fmt_cont_comment(
-                    fo, connectors, maxlens, space, bol, reverse, location,
+                    fo, connectors, maxwidth, space, bol, reverse, location,
                 )?;
             }
             let mut start = 0;
             loop {
-                let slen = min(line.len() - start, cmt_width);
                 if seq_width > 0 {
                     if start == 0 && line.len() != 0 {
                         write!(
@@ -605,15 +602,26 @@ impl Todo {
                         write!(fo, "{}", space.repeat(seq_width))?;
                     }
                 }
-                write!(fo, "{}", &line[start..start + slen])?;
-                write!(fo, "{}", space.repeat(cmt_width - slen))?;
+                let mut column = 0;
+                for cr in line.chars().skip(start) {
+                    let cw = cr.width().unwrap_or(0);
+                    if column + cw > cmt_width {
+                        break;
+                    }
+                    write!(fo, "{}", cr)?;
+                    column += cw;
+                    start += 1;
+                    if column == cmt_width {
+                        break;
+                    }
+                }
+                write!(fo, "{}", space.repeat(cmt_width - column))?;
                 write!(fo, "{}│{}", space, eol)?;
-                start += slen;
-                if start >= line.len() {
+                if start >= line.chars().count() {
                     break;
                 }
                 self.fmt_cont_comment(
-                    fo, connectors, maxlens, space, bol, reverse, location,
+                    fo, connectors, maxwidth, space, bol, reverse, location,
                 )?;
             }
         }
