@@ -17,8 +17,8 @@ fn examples() {
             let (hide, depth, outdir, reverse, formats) = match idx {
                 0 => (false, 0, "examples/output/", false, &f4),
                 1 => (true, 0, "examples/hide/", false, &f4),
-                2 => (false, 2, "examples/depth/pos2/", false, &f4),
-                3 => (false, -1, "examples/depth/neg1/", false, &f4),
+                2 => (false, 2, "examples/depth-pos2/", false, &f4),
+                3 => (false, -1, "examples/depth-neg1/", false, &f4),
                 _ => (false, 0, "examples/reverse/", true, &f2),
             };
             println!("Index: {}\t{}", md, outdir);
@@ -130,8 +130,8 @@ fn errors() {
 #[test]
 fn multi() {
     let inputs = vec![
-        String::from("tests/multi/1.md"),
-        String::from("tests/multi/2.md"),
+        String::from("tests/multi-input/1.md"),
+        String::from("tests/multi-input/2.md"),
     ];
     let result = Tree::new(
         &inputs,
@@ -152,7 +152,7 @@ fn multi() {
     let tree = match result {
         Ok(t) => t,
         Err(e) => {
-            panic!("ERR-907: multi, {}", e);
+            panic!("ERR-907: multi-input, {}", e);
         }
     };
     let mut output = String::new();
@@ -160,11 +160,11 @@ fn multi() {
         Ok(s) => s,
         Err(e) => panic!("ERR-908: Failed to write '{}'", e),
     }
-    let standard = match read_to_string("tests/multi/out.term") {
+    let standard = match read_to_string("tests/multi-input/out.term") {
         Ok(s) => s,
         Err(e) => {
-            panic!("ERR-909: multi, {}", e);
+            panic!("ERR-909: multi-input, {}", e);
         }
     };
-    assert!(standard == output, "ERR-910: multi");
+    assert!(standard == output, "ERR-910: multi-input");
 }

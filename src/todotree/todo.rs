@@ -608,7 +608,9 @@ impl Todo {
                     if column + cw > cmt_width {
                         break;
                     }
-                    write!(fo, "{}", cr)?;
+                    let htmlcr =
+                        if cr == ' ' { space } else { &cr.to_string() };
+                    write!(fo, "{}", htmlcr)?;
                     column += cw;
                     start += 1;
                     if column == cmt_width {
