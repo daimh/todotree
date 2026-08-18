@@ -117,8 +117,8 @@ impl Tree {
             maxwidth: [0; 3],
             separator: separator.to_string(),
             auxilaries: Vec::new(),
-            no_color: no_color,
-            reverse: reverse,
+            no_color,
+            reverse,
         };
         let mut dict = BTreeMap::new();
         let mut list: Vec<String> = Vec::new();
@@ -140,20 +140,20 @@ impl Tree {
             )?;
         }
         // check dict
-        if dict.len() == 0 {
+        if dict.is_empty() {
             return Err(TodoError::Input(
                 "ERR-010: The markdown file does not have any TODO".to_string(),
             ));
         }
         // add all TODOs that have no parent to ROOT's dependencies
-        if tree.root.borrow().dependencies.len() == 0 {
+        if tree.root.borrow().dependencies.is_empty() {
             let mut noparent: BTreeSet<String> = dict.keys().cloned().collect();
             for todo in dict.values() {
                 for dep in &todo.borrow().dependencies {
                     let dep = dep.replace("~", "");
                     noparent.remove(&dep);
                 }
-                if noparent.len() == 0 {
+                if noparent.is_empty() {
                     return Err(TodoError::Input(
                         "ERR-007: Failed to find root node, as all todos \
                              are in dependency loops"
@@ -261,7 +261,7 @@ impl Tree {
                 name = ln.get(2..).map(|x| x.trim().to_string()).ok_or_else(
                     || TodoError::Input(format!("ERR-015: TODO name '{}'", ln)),
                 )?;
-                if name == "" || name == ROOT {
+                if name.is_empty() || name == ROOT {
                     return Err(TodoError::Input(format!(
                         "ERR-009: '{}' is a reserved TODO name keyword",
                         ROOT
@@ -284,7 +284,7 @@ impl Tree {
                 dependencies = Vec::new();
                 auxilaries = Vec::new();
             } else if ln.starts_with("- @ ") {
-                if owner.len() > 0 {
+                if !owner.is_empty() {
                     return Err(TodoError::Input(
                         "ERR-008: Owner cannot be specified multiple times"
                             .to_string(),
@@ -303,7 +303,6 @@ impl Tree {
                     &mut ln
                         .get(3..)
                         .unwrap()
-                        .trim()
                         .split_whitespace()
                         .map(|s| {
                             if s.contains('@') {
@@ -425,9 +424,10 @@ impl Tree {
         dict: &mut BTreeMap<String, Rc<RefCell<Todo>>>,
         list: &mut Vec<String>,
     ) -> Result<(), TodoError> {
-        if name == "" {
+        if name.is_empty() {
             self.auxilaries = auxilaries;
-            if owner == "" && comment.len() == 0 && dependencies.len() == 0 {
+            if owner.is_empty() && comment.is_empty() && dependencies.is_empty()
+            {
                 return Ok(());
             } else {
                 return Err(TodoError::Input(

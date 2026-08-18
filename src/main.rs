@@ -94,7 +94,7 @@ fn main() -> Result<(), TodoError> {
         println!("Created todotree.md");
     }
     let mut inputs = matches.opt_strs("input");
-    if inputs.len() == 0 {
+    if inputs.is_empty() {
         inputs = vec!["todotree.md".to_string()];
     }
     let mut owners: BTreeMap<String, bool> = matches
@@ -118,11 +118,11 @@ fn main() -> Result<(), TodoError> {
         if matches.opt_str("format").is_some_and(|s| s != "term") {
             return rtn;
         }
-        if let Err(_) = rtn {
-            if let Err(TodoError::Io(ref err)) = rtn {
-                if err.kind() == io::ErrorKind::NotFound {
-                    return rtn;
-                }
+        if rtn.is_err() {
+            if let Err(TodoError::Io(ref err)) = rtn
+                && err.kind() == io::ErrorKind::NotFound
+            {
+                return rtn;
             }
             println!("{:?}", rtn);
         }
@@ -130,7 +130,7 @@ fn main() -> Result<(), TodoError> {
         for mdfile in &inputs {
             if let Err(e) = inotify
                 .watches()
-                .add(&mdfile, WatchMask::CLOSE | WatchMask::MODIFY)
+                .add(mdfile, WatchMask::CLOSE | WatchMask::MODIFY)
             {
                 if e.kind() == ErrorKind::NotFound {
                     thread::sleep(Duration::from_secs(1));
@@ -157,10 +157,7 @@ fn print_tree(
         print!("\x1B[2J\x1B[1;1H");
         io::stdout().flush()?;
     }
-    let format = match matches.opt_str("format") {
-        Some(x) => x,
-        None => String::new(),
-    };
+    let format = matches.opt_str("format").unwrap_or_default();
     let depth: i32 = match matches.opt_str("depth") {
         Some(x) => x.parse()?,
         None => 0,
