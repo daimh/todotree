@@ -58,11 +58,11 @@ impl Todo {
             _ => auxilaries,
         };
         Ok(Todo {
-            name: name,
-            owner: owner,
-            comment: comment,
-            status: status,
-            dependencies: dependencies,
+            name,
+            owner,
+            comment,
+            status,
+            dependencies,
             auxilaries: realauxl,
             children: Vec::new(),
             depth: 0,
@@ -83,7 +83,7 @@ impl Todo {
         format: &Format,
         owners: &mut BTreeMap<String, bool>,
     ) -> Result<bool, TodoError> {
-        let mut own_me = if owners.len() == 0 {
+        let mut own_me = if owners.is_empty() {
             true
         } else if owners.contains_key(&self.owner) {
             owners.insert(self.owner.clone(), true);
@@ -108,7 +108,7 @@ impl Todo {
                 None => {
                     return Err(TodoError::Input(format!(
                         "ERR-003: TODO '{}' is missing in the markdown file",
-                        &dep
+                        dep
                     )));
                 }
             };
@@ -116,36 +116,36 @@ impl Todo {
             if dep_notdone {
                 notdonedeps.push(dep.clone());
             }
-            if dpth_limit <= 0 || dpth_limit > depth as i32 {
-                if visited.insert(child.borrow().name.clone()) {
-                    let own_child = child.borrow_mut().build_tree(
-                        visited,
-                        map,
-                        maxwidth,
-                        path,
-                        depth + 1,
-                        screen_width,
-                        hide_done,
-                        hide_owner,
-                        dpth_limit,
-                        format,
-                        owners,
-                    )?;
-                    if own_child {
-                        own_me = true;
-                        let child_depth = child.borrow().depth;
-                        self.depth = max(child_depth + 1, self.depth);
-                        if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
-                            && (dep_notdone || !hide_done)
-                        {
-                            self.children.push(Rc::clone(child));
-                        }
+            if (dpth_limit <= 0 || dpth_limit > depth as i32)
+                && visited.insert(child.borrow().name.clone())
+            {
+                let own_child = child.borrow_mut().build_tree(
+                    visited,
+                    map,
+                    maxwidth,
+                    path,
+                    depth + 1,
+                    screen_width,
+                    hide_done,
+                    hide_owner,
+                    dpth_limit,
+                    format,
+                    owners,
+                )?;
+                if own_child {
+                    own_me = true;
+                    let child_depth = child.borrow().depth;
+                    self.depth = max(child_depth + 1, self.depth);
+                    if (dpth_limit >= 0 || child_depth + dpth_limit >= 0)
+                        && (dep_notdone || !hide_done)
+                    {
+                        self.children.push(Rc::clone(child));
                     }
                 }
             }
             path.remove(&dep);
         }
-        if notdonedeps.len() == 0 {
+        if notdonedeps.is_empty() {
             if self.status != Status::Completed {
                 self.status = Status::Actionable;
             }
@@ -158,7 +158,7 @@ impl Todo {
         }
         if self.name == ROOT {
             self.get_maxwidth(maxwidth, 0, screen_width)?;
-        } else if self.dependencies.len() > 0
+        } else if !self.dependencies.is_empty()
             && !self.name.ends_with(ROOT)
             && ((dpth_limit > 0 && dpth_limit == depth as i32)
                 || (dpth_limit < 0 && self.depth + dpth_limit == 0))
@@ -269,10 +269,10 @@ impl Todo {
                         write!(fo, "~")?;
                     }
                     writeln!(fo, "{}", self.name)?;
-                    if self.owner != "" {
+                    if !self.owner.is_empty() {
                         writeln!(fo, "- @ {}", self.owner)?;
                     }
-                    if self.dependencies.len() > 0 {
+                    if !self.dependencies.is_empty() {
                         let normalized = self
                             .dependencies
                             .iter()
@@ -295,7 +295,7 @@ impl Todo {
                 if maxwidth[1] > 0 {
                     writeln!(fo, "{}  \"owner\": \"{}\",", space, self.owner)?;
                 }
-                if maxwidth[2] > 0 && self.comment.len() > 0 {
+                if maxwidth[2] > 0 && !self.comment.is_empty() {
                     writeln!(
                         fo,
                         "{}  \"comment\": \"{}\",",
@@ -438,7 +438,7 @@ impl Todo {
                 Location::Mid
             }
         } else {
-            let mut last = self.children.len() == 0;
+            let mut last = self.children.is_empty();
             if last {
                 for b in connectors.iter() {
                     last = last && *b;
@@ -487,12 +487,12 @@ impl Todo {
             write!(fo, "{}", space.repeat(3))?;
         }
         if reverse {
-            if connectors.len() > 0 {
+            if !connectors.is_empty() {
                 write!(fo, "│{}", space.repeat(4))?
             } else {
                 write!(fo, "{}", space)?
             }
-        } else if self.children.len() == 0 || *location == Location::Top {
+        } else if self.children.is_empty() || *location == Location::Top {
             write!(fo, "{}", space)?;
         } else {
             write!(fo, "│")?;
@@ -568,7 +568,7 @@ impl Todo {
         };
         let mut non_empty_line_cnt = 0;
         for line in comt {
-            if line != "" {
+            if !line.is_empty() {
                 non_empty_line_cnt += 1;
             }
         }
@@ -580,7 +580,7 @@ impl Todo {
         let cmt_width = maxwidth[2] - seq_width;
         let mut empty_line_count = 0;
         for (idx, line) in comt.iter().enumerate() {
-            if line == "" {
+            if line.is_empty() {
                 empty_line_count += 1;
             }
             if idx > 0 {
@@ -591,7 +591,7 @@ impl Todo {
             let mut start = 0;
             loop {
                 if seq_width > 0 {
-                    if start == 0 && line.len() != 0 {
+                    if start == 0 && !line.is_empty() {
                         write!(
                             fo,
                             "{:0>dgt_width$}.{}",
