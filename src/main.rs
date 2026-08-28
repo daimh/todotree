@@ -85,6 +85,19 @@ fn main() -> Result<(), TodoError> {
 # ~mower
 - @ Brody
 - % test the mower
+
+# unicode
+- : table arrow
+
+# table
+- % ╭─┬─╮
+- % │ │ │
+- % ├─┼─┤
+- % │ │ │
+- % ╰─┴─╯
+
+# arrow
+- % ▲ ▼ ◄ ►
 ";
         let mut file = OpenOptions::new()
             .write(true)

@@ -1,6 +1,5 @@
 [package]
 name = "todotree"
-version = "1.2.0"
 edition = "2024"
 authors = ["Manhong Dai"]
 license = "MIT"
